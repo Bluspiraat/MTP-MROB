@@ -1,0 +1,17 @@
+{
+	"unknown": 0,
+	"hardened": 1,
+	"half-hardened": 2,
+	"unhardened": 3,
+	"track": 4,
+	"fallow": 5,
+	"built": 6,
+	"agriculture": 7,
+	"forest": 8,
+	"grassland": 9,
+	"heath": 10,
+	"dune": 11,
+	"sand": 12,
+	"water": 13,
+	"other": 14
+}
