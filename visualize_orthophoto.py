@@ -69,7 +69,8 @@ if __name__ == "__main__":
         orthophoto_tiles.append(Orthophoto_Tile(int(image_name_str[1]), int(image_name_str[2]), image_name))
 
     # Test platform
-    plt.imshow(get_image(orthophoto_tiles, x_min=251350, x_max=252500, y_min=471000, y_max=471500))
+    image = get_image(orthophoto_tiles, x_min=251000, x_max=251999, y_min=471000, y_max=471999)
+    plt.imshow(image[0])
     plt.show()
 
 
