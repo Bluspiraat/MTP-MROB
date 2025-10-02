@@ -1,90 +1,112 @@
 import glob
 import matplotlib.pyplot as plt
 import rasterio
-from math import floor
 import numpy as np
 
 class Orthophoto_Tile():
-    def __init__(self, x_min, y_min, image_location):
-        self.tile_size = 1000
-        self.x_min = x_min
-        self.y_min = y_min
+    def __init__(self, image_location):
+        self.minx = 0
+        self.miny = 0
+        self.maxx = 0
+        self.maxy = 0
+        self.size = 0
+        self.resolution = 0
         self.image_location = image_location
-        #ToDo: Implement resolution
+        self._extract_photo_information()
+
+    def _extract_photo_information(self):
+        with rasterio.open(self.image_location) as src:
+            self.size = src.width
+            self.resolution = src.res[0]
+            self.minx = int(src.bounds[0])
+            self.miny = int(src.bounds[1])
+            self.maxx = int(src.bounds[2])
+            self.maxy = int(src.bounds[3])
 
     def converted_image(self):
         with rasterio.open(self.image_location) as src:
-            img_read = src.read([1, 2, 3])  # RGB channels (1=R, 2=G, 3=B) # Export information bands and puts them into one an array shaped like: (RGB, height, width) its a height x width array of 3 item arrays.
+            img_read = src.read([1, 2,
+                                 3])  # RGB channels (1=R, 2=G, 3=B) # Export information bands and puts them into one an array shaped like: (RGB, height, width) its a height x width array of 3 item arrays.
             converted_image = img_read.transpose(1, 2, 0)  # Reorder np.array to height, width, RGB)
         return converted_image
 
     def show_image(self):
-        extent = [self.x_min, self.x_min + self.tile_size, self.y_min, self.y_min + self.tile_size]
+        extent = [self.minx, self.minx + self.size, self.miny, self.miny + self.size]
         plt.imshow(self.converted_image(), extent=extent, origin="upper")
         plt.title("Orthophoto image")
         plt.xlabel("X - coordinates")
         plt.ylabel("Y - coordinates")
         plt.show()
 
+
 def _get_orthophoto_tiles(photo_folder):
     images = glob.glob(photo_folder + "/*.tif")
     orthophoto_tiles = []
     # Import images into orthophoto tiles from 251 - 259k horizontally 471 - 478k vertically (Rijksdriehoek coordinates)
     for image_name in images:
-        image_name_str = image_name.split('_')
-        orthophoto_tiles.append(Orthophoto_Tile(int(image_name_str[1]), int(image_name_str[2]), image_name))
-
+        orthophoto_tiles.append(Orthophoto_Tile(image_name))
     return orthophoto_tiles
 
-    
+
 # Get tiles and place them in a dictionary with key based on their position, every tile should be placed at their corresponding key value pair
-def _get_orthophoto_grid(orthophoto_tiles, lb_hor, ub_hor, lb_ver, ub_ver):
+def _get_orthophoto_grid(orthophoto_tiles, minx, maxx, miny, maxy):
+    origin_x = (minx // 1000) * 1000
+    origin_y = (miny // 1000) * 1000
+
     orthophoto_grid = {}
     for photo in orthophoto_tiles:
-        if lb_hor <= photo.x_min <= ub_hor and lb_ver <= photo.y_min <= ub_ver:
-            orthophoto_grid[((photo.x_min-lb_hor)*20, (photo.y_min-lb_ver)*20)] = photo
+        if not (photo.maxx <= minx or photo.minx >= maxx or
+                photo.maxy <= miny or photo.miny >= maxy):
+            dict_x = int((photo.minx - origin_x) / 1000)
+            dict_y = int((photo.miny - origin_y) / 1000)
+            orthophoto_grid[dict_x, dict_y] = photo
     print("Orthophoto grid size created with number of tiles: " + str(len(orthophoto_grid)))
     return orthophoto_grid
 
 
-# Create image in which they will be stitched
-def _get_stitched_image(orthophoto_grid, lb_hor, ub_hor, lb_ver, ub_ver):
-    stitched_image = np.zeros([(int(ub_ver/1000) - int(lb_ver/1000) + 1)*20000,
-                               (int(ub_hor/1000)-int(lb_hor/1000) + 1)*20000,
-                               3], dtype=np.uint8)
+# Create stitched image
+def _get_stitched_image(orthophoto_grid):
+    # Max indices for each dimension
+    max_i = max(i for i, j in orthophoto_grid.keys())
+    max_j = max(j for i, j in orthophoto_grid.keys())
 
-    # Stitch images
-    for key in orthophoto_grid.keys():
-        stitched_image[key[1]:(key[1]+20000), key[0]:(key[0]+20000)] = orthophoto_grid[key].converted_image()
+    # Determine colums and row numbers
+    width = (max_i + 1) * 20000
+    height = (max_j + 1) * 20000
+
+    stitched_image = np.zeros((height, width, 3), dtype=np.uint8)
+
+    # place tiles: invert vertical index so j=0 (bottom) maps to bottom of array
+    for (i, j), photo in orthophoto_grid.items():
+        row_start = (max_j - j) * 20000
+        col_start = i * 20000
+        stitched_image[row_start:row_start + 20000,
+        col_start:col_start + 20000] = photo.converted_image()
 
     return stitched_image
 
-
 # Extracts tiles and forms the requested image.
-# Default values: x_min=251000, x_max=251999, y_min=471000, y_max=471999
 def get_image(photo_folder, output_name, minx, miny, maxx, maxy):
-    # Determine bounds
-    lb_hor = int(floor(minx/1000))*1000
-    ub_hor = int(floor(maxx/1000))*1000
-    lb_ver = int(floor(miny/1000))*1000
-    ub_ver = int(floor(maxy/1000))*1000
+    # Determine bounds (meters conversion to pixels count)
+    lb_hor = int(minx // 1000) * 1000
+    lb_ver = int(miny // 1000) * 1000
 
     # Create orthophoto tiles
     orthophoto_tiles = _get_orthophoto_tiles(photo_folder)
 
     # Create orthophoto grid
-    orthophoto_grid = _get_orthophoto_grid(orthophoto_tiles, lb_hor, ub_hor, lb_ver, ub_ver)
+    orthophoto_grid = _get_orthophoto_grid(orthophoto_tiles, minx, maxx, miny, maxy)
 
     # Create stitched image
-    stitched_image = _get_stitched_image(orthophoto_grid, lb_hor, ub_hor, lb_ver, ub_ver)
+    stitched_image = _get_stitched_image(orthophoto_grid)
+    vertical_length = stitched_image.shape[0]
 
     # Subset the requested area
-    minx, maxx = (minx-lb_hor)*20, (maxx-lb_hor)*20
-    miny, maxy = (miny-lb_ver)*20, (maxy-lb_ver)*20
-    flipped_stitch = np.flipud(stitched_image)
-    subset = flipped_stitch[miny:maxy, minx:maxx]
+    m_to_p = 20000/1000
+    minx_subset, maxx_subset = int((minx-lb_hor)*m_to_p), int((maxx-lb_hor)*m_to_p)
+    maxy_subset, miny_subset = int(vertical_length-(miny-lb_ver)*m_to_p), int(vertical_length-(maxy-lb_ver)*m_to_p)
+    subset = stitched_image[miny_subset:maxy_subset, minx_subset:maxx_subset]
     plt.imshow(subset)
+    plt.show()
     plt.savefig(output_name + ".jpg")
     print("Saved output image to: " + output_name + ".jpg")
-
-
