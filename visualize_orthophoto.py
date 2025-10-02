@@ -26,51 +26,65 @@ class Orthophoto_Tile():
         plt.ylabel("Y - coordinates")
         plt.show()
 
-# Extracts tiles and forms the requested image.
-def get_image(photo_list, x_min, x_max, y_min, y_max):
-    # Determine bounds
-    lower_bound_horizontal = int(floor(x_min/1000))*1000
-    upper_bound_horizontal = int(floor(x_max/1000))*1000
-    lower_bound_vertical = int(floor(y_min/1000))*1000
-    upper_bound_vertical = int(floor(y_max/1000))*1000
+def _get_orthophoto_tiles(photo_folder):
+    images = glob.glob(photo_folder + "/*.tif")
+    orthophoto_tiles = []
+    # Import images into orthophoto tiles from 251 - 259k horizontally 471 - 478k vertically (Rijksdriehoek coordinates)
+    for image_name in images:
+        image_name_str = image_name.split('_')
+        orthophoto_tiles.append(Orthophoto_Tile(int(image_name_str[1]), int(image_name_str[2]), image_name))
 
+    return orthophoto_tiles
+
+    
+# Get tiles and place them in a dictionary with key based on their position, every tile should be placed at their corresponding key value pair
+def _get_orthophoto_grid(orthophoto_tiles, lb_hor, ub_hor, lb_ver, ub_ver):
     orthophoto_grid = {}
+    for photo in orthophoto_tiles:
+        if lb_hor <= photo.x_min <= ub_hor and lb_ver <= photo.y_min <= ub_ver:
+            orthophoto_grid[((photo.x_min-lb_hor)*20, (photo.y_min-lb_ver)*20)] = photo
+    print("Orthophoto grid size created with number of tiles: " + str(len(orthophoto_grid)))
+    return orthophoto_grid
 
-    # Get tiles and place them in a dictionary with key based on their position, every tile should be placed at their corresponding key value pair
-    for photo in photo_list:
-        if lower_bound_horizontal <= photo.x_min <= upper_bound_horizontal and lower_bound_vertical <= photo.y_min <= upper_bound_vertical:
-            orthophoto_grid[((photo.x_min-lower_bound_horizontal)*20, (photo.y_min-lower_bound_vertical)*20)] = photo
 
-    # Create image in which they will be stitched
-    stitched_image = np.zeros([(int(upper_bound_vertical/1000) - int(lower_bound_vertical/1000) + 1)*20000,
-                               (int(upper_bound_horizontal/1000)-int(lower_bound_horizontal/1000) + 1)*20000,
+# Create image in which they will be stitched
+def _get_stitched_image(orthophoto_grid, lb_hor, ub_hor, lb_ver, ub_ver):
+    stitched_image = np.zeros([(int(ub_ver/1000) - int(lb_ver/1000) + 1)*20000,
+                               (int(ub_hor/1000)-int(lb_hor/1000) + 1)*20000,
                                3], dtype=np.uint8)
 
     # Stitch images
     for key in orthophoto_grid.keys():
         stitched_image[key[1]:(key[1]+20000), key[0]:(key[0]+20000)] = orthophoto_grid[key].converted_image()
 
+    return stitched_image
+
+
+# Extracts tiles and forms the requested image.
+# Default values: x_min=251000, x_max=251999, y_min=471000, y_max=471999
+def get_image(photo_folder, output_name, minx, miny, maxx, maxy):
+    # Determine bounds
+    lb_hor = int(floor(minx/1000))*1000
+    ub_hor = int(floor(maxx/1000))*1000
+    lb_ver = int(floor(miny/1000))*1000
+    ub_ver = int(floor(maxy/1000))*1000
+
+    # Create orthophoto tiles
+    orthophoto_tiles = _get_orthophoto_tiles(photo_folder)
+
+    # Create orthophoto grid
+    orthophoto_grid = _get_orthophoto_grid(orthophoto_tiles, lb_hor, ub_hor, lb_ver, ub_ver)
+
+    # Create stitched image
+    stitched_image = _get_stitched_image(orthophoto_grid, lb_hor, ub_hor, lb_ver, ub_ver)
+
     # Subset the requested area
-    x_min, x_max = (x_min-lower_bound_horizontal)*20, (x_max-lower_bound_horizontal)*20
-    y_min, y_max = (y_min-lower_bound_vertical)*20, (y_max-lower_bound_vertical)*20
+    minx, maxx = (minx-lb_hor)*20, (maxx-lb_hor)*20
+    miny, maxy = (miny-lb_ver)*20, (maxy-lb_ver)*20
     flipped_stitch = np.flipud(stitched_image)
-    subset = flipped_stitch[y_min:y_max, x_min:x_max]
-    return np.flipud(subset), x_min, x_max, y_min, y_max
-
-
-if __name__ == "__main__":
-    FILE_FOLDER = "Data/AHN and Ortho/hwh-ortho/2025"
-    images = glob.glob(FILE_FOLDER + "/*.tif")
-    orthophoto_tiles = []
-
-    # Import images into orthophoto tiles from 251 - 259k horizontally 471 - 478k vertically (Rijksdriehoek coordinates)
-    for image_name in images:
-        image_name_str = image_name.split('_')
-        orthophoto_tiles.append(Orthophoto_Tile(int(image_name_str[1]), int(image_name_str[2]), image_name))
-
-    # Test platform
-    image = get_image(orthophoto_tiles, x_min=251000, x_max=251999, y_min=471000, y_max=471999)
-    plt.imshow(image[0])
-    plt.show()
+    subset = flipped_stitch[miny:maxy, minx:maxx]
+    plt.imshow(subset)
+    plt.savefig(output_name + ".jpg")
+    print("Saved output image to: " + output_name + ".jpg")
 
 
