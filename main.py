@@ -1,11 +1,17 @@
 from visualize_brt import create_BRT_export
 from visualize_orthophoto import get_image
+from visualize_ahn import get_ahn_data
 
 if __name__ == '__main__':
     minx = 251000  # 251000
     miny = 471000  # 471000
-    maxx = 251999  # 251999
-    maxy = 471999  # 471999
+    maxx = 252000  # 251999
+    maxy = 472000  # 471999
+
+    # get AHN data
+    file_folder = "Data/AHN and Ortho/hwh-ahn/"
+    output_name = "AHN_data"
+    get_ahn_data(file_folder, output_name, minx, miny, maxx, maxy)
 
     # Get orthophoto
     output_name = "orthophoto"

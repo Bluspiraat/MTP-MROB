@@ -110,7 +110,7 @@ def create_BRT_export(gml_files, resolution, output_name, minx, miny, maxx, maxy
     meta_data = _get_meta_data(height, width, final_raster, transform)
 
     # Export raster
-    with rasterio.open(output_name + ".tif", "w", **meta_data) as dst:
+    with rasterio.open(output_name + ".tif", "w", **meta_data, compress="lzw") as dst:
         dst.write(final_raster, 1)
 
     print(f"Raster saved to {output_name + ".tif"}")

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import rasterio
 import numpy as np
 
+
 class Orthophoto_Tile():
     def __init__(self, image_location):
         self.minx = 0
@@ -85,6 +86,34 @@ def _get_stitched_image(orthophoto_grid):
 
     return stitched_image
 
+
+def _export_photo_subset(output_name, photo, minx, maxy, resolution):
+    crs = "EPSG:28992"
+
+    # Ensure array is in (bands, height, width)
+    if photo.shape[2] == 3:
+        photo = np.transpose(photo, (2, 0, 1))
+
+    height, width = photo.shape[1], photo.shape[2]
+    transform = rasterio.transform.from_origin(minx, maxy, resolution, resolution)
+
+    with rasterio.open(
+            output_name + '.tif',
+            "w",
+            driver="GTiff",
+            height=height,
+            width=width,
+            count=3,
+            dtype=photo.dtype,
+            crs=crs,
+            transform=transform,
+            compress="jpeg",
+            jpeg_quality=90  # 90 is usually visually indistinguishable from original
+    ) as dst:
+        dst.write(photo)
+        print("Saved output image to: " + output_name + ".tif")
+
+
 # Extracts tiles and forms the requested image.
 def get_image(photo_folder, output_name, minx, miny, maxx, maxy):
     # Determine bounds (meters conversion to pixels count)
@@ -102,11 +131,10 @@ def get_image(photo_folder, output_name, minx, miny, maxx, maxy):
     vertical_length = stitched_image.shape[0]
 
     # Subset the requested area
-    m_to_p = 20000/1000
-    minx_subset, maxx_subset = int((minx-lb_hor)*m_to_p), int((maxx-lb_hor)*m_to_p)
-    maxy_subset, miny_subset = int(vertical_length-(miny-lb_ver)*m_to_p), int(vertical_length-(maxy-lb_ver)*m_to_p)
+    resolution = orthophoto_tiles[0].resolution
+    m_to_p = int(1/orthophoto_tiles[0].resolution)
+    minx_subset, maxx_subset = int((minx - lb_hor) * m_to_p), int((maxx - lb_hor) * m_to_p)
+    maxy_subset, miny_subset = int(vertical_length - (miny - lb_ver) * m_to_p), int(
+        vertical_length - (maxy - lb_ver) * m_to_p)
     subset = stitched_image[miny_subset:maxy_subset, minx_subset:maxx_subset]
-    plt.imshow(subset)
-    plt.show()
-    plt.savefig(output_name + ".jpg")
-    print("Saved output image to: " + output_name + ".jpg")
+    _export_photo_subset(output_name, subset, minx, maxy, resolution)
