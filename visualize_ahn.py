@@ -40,21 +40,31 @@ def _get_ahn_tiles(ahn_file_folder):
     ahn_tiles = []
     for file in glob.glob(ahn_file_folder + '*.tif'):
         ahn_tiles.append(AHN_Tile(file))
-    print("Number of tiles found in folder and thus created: " + str(len(ahn_tiles)))
+    print("Number of AHN tiles found in folder and thus created: " + str(len(ahn_tiles)))
     return ahn_tiles
 
+def _find_origin(ahn_tiles):
+    origin_x = ahn_tiles[0].minx
+    origin_y = ahn_tiles[0].miny
+    for ahn_tile in ahn_tiles:
+        if ahn_tile.minx < origin_x or ahn_tile.miny < origin_y:
+            origin_x = ahn_tile.minx
+            origin_y = ahn_tile.miny
+    return origin_x, origin_y
+
 def _get_ahn_grid(ahn_tiles, minx, miny, maxx, maxy):
-    origin_x = (minx // ahn_tiles[0].width) * ahn_tiles[0].width
-    origin_y = (miny // ahn_tiles[0].height) * ahn_tiles[0].height
+    width_m = ahn_tiles[0].width*ahn_tiles[0].resolution
+    height_m = ahn_tiles[0].height*ahn_tiles[0].resolution
+    origin_x, origin_y = _find_origin(ahn_tiles)
 
     ahn_grid = {}
     for tile in ahn_tiles:
         if not (tile.maxx <= minx or tile.minx >= maxx or
                 tile.maxy <= miny or tile.miny >= maxy):
-            dict_x = int((tile.minx - origin_x) / ahn_tiles[0].width)
-            dict_y = int((tile.miny - origin_y) / ahn_tiles[0].height)
+            dict_x = int((tile.minx - origin_x) / width_m)
+            dict_y = int((tile.miny - origin_y) / height_m)
             ahn_grid[dict_x, dict_y] = tile
-    print("Orthophoto grid size created with number of tiles: " + str(len(ahn_grid)))
+    print("AHN grid size created with number of tiles: " + str(len(ahn_grid)))
     return ahn_grid
 
 
