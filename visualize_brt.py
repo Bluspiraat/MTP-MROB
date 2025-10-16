@@ -6,6 +6,9 @@ from rasterio.transform import from_origin
 import json
 import numpy as np
 
+from osgeo import gdal
+gdal.PushErrorHandler('CPLQuietErrorHandler')
+
 
 def _get_dictionaries():
     # Input dictionaries
@@ -33,9 +36,9 @@ def _create_gdf_list(gmls, clip_geometry, class_grouping):
         attribute_count_old = len(gdf_new[attribute].unique())
         gdf_new[attribute] = gdf_new[attribute].map(class_grouping)
         attribute_count_new = len(gdf_new[attribute].unique())
-        print("For file: " + str(gml_file) + " New bounds after clipping: " + str(
-            gdf_new.total_bounds) + ". The total number of distinct classes was: " + str(
-            attribute_count_old) + " and is now: " + str(attribute_count_new))
+        # print("For file: " + str(gml_file) + " New bounds after clipping: " + str(
+        #     gdf_new.total_bounds) + ". The total number of distinct classes was: " + str(
+        #     attribute_count_old) + " and is now: " + str(attribute_count_new))
         gdf_list.append(gdf_new)
     return gdf_list
 
@@ -47,7 +50,7 @@ def _obtain_shapes(gdf_list, gmls, class_map):
     for gdf, gml in zip(gdf_list, gmls):
         shapes_temp = ((geom, class_map[class_value]) for geom, class_value in zip(gdf.geometry, gdf[gml[1]]))
         shapes_list.append(shapes_temp)
-    print("Converted all shapes to integer representations")
+    # print("Converted all shapes to integer representations")
     return shapes_list
 
 
@@ -113,15 +116,25 @@ def create_BRT_export(gml_files, resolution, output_name, minx, miny, maxx, maxy
     with rasterio.open(output_name + ".tif", "w", **meta_data, compress="lzw") as dst:
         dst.write(final_raster, 1)
 
-    print(f"Raster saved to {output_name + ".tif"}")
+    # print(f"Raster saved to {output_name + ".tif"}")
 
     # Report on the number of unique labels present in the final export
     unique_indices = np.unique(final_raster)
     class_map_inverted = {v: k for k, v in class_map.items()}
     labels_present = [class_map_inverted[index] for index in unique_indices]
 
-    print("Rasterized and merges all provided layers")
-    print("Present labels are: " + str(labels_present))
+    # print("Rasterized and merges all provided layers")
+    # print("Present labels are: " + str(labels_present))
+
+
+def get_brt_boundaries(gmls):
+    boundaries = [gpd.read_file(gml).total_bounds for gml in gmls]
+    minx = max([boundary[0] for boundary in boundaries])
+    miny = max([boundary[1] for boundary in boundaries])
+    maxx = min([boundary[2] for boundary in boundaries])
+    maxy = min([boundary[3] for boundary in boundaries])
+    return [minx, miny, maxx, maxy]
+
 
 
 

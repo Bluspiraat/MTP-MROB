@@ -1,4 +1,5 @@
 import glob
+from itertools import product
 import rasterio
 import numpy as np
 import rasterio
@@ -40,7 +41,7 @@ def _get_ahn_tiles(ahn_file_folder):
     ahn_tiles = []
     for file in glob.glob(ahn_file_folder + '*.tif'):
         ahn_tiles.append(AHN_Tile(file))
-    print("Number of AHN tiles found in folder and thus created: " + str(len(ahn_tiles)))
+    # print("Number of AHN tiles found in folder and thus created: " + str(len(ahn_tiles)))
     return ahn_tiles
 
 def _find_origin(ahn_tiles):
@@ -64,7 +65,7 @@ def _get_ahn_grid(ahn_tiles, minx, miny, maxx, maxy):
             dict_x = int((tile.minx - origin_x) / width_m)
             dict_y = int((tile.miny - origin_y) / height_m)
             ahn_grid[dict_x, dict_y] = tile
-    print("AHN grid size created with number of tiles: " + str(len(ahn_grid)))
+    # print("AHN grid size created with number of tiles: " + str(len(ahn_grid)))
     return ahn_grid
 
 
@@ -108,6 +109,8 @@ def _export_ahn_subset(output_name, ahn_grid, minx, maxy, resolution):
     ) as dst:
         dst.write(ahn_grid.astype('float16'), 1)
 
+    # print("AHN tile exported as " + output_name + ".tif")
+
 def get_ahn_data(ahn_file_folder, output_name, minx, miny, maxx, maxy):
     ahn_tiles = _get_ahn_tiles(ahn_file_folder)
     ahn_grid = _get_ahn_grid(ahn_tiles, minx, miny, maxx, maxy)
@@ -136,6 +139,28 @@ def get_ahn_data(ahn_file_folder, output_name, minx, miny, maxx, maxy):
 
     _export_ahn_subset(output_name, subset_highres, minx, maxy, res/zoom_factor)
 
+def _check_tile_continuity(boundaries):
+    # First check if there are now row or column gaps
+    x_coords = sorted(set([boundary[0] for boundary in boundaries]))
+    x_interval = [b - a for a, b in zip(x_coords, x_coords[1:])]
+    assert len(set(x_interval)) == 1, "A column of tiles is missing creating a gap"
 
+    y_coords = sorted(set([boundary[1] for boundary in boundaries]))
+    y_interval = [b - a for a, b in zip(y_coords, y_coords[1:])]
+    assert len(set(y_interval)) == 1, "A column of tiles is missing creating a gap"
+
+    # Create grid with tiles
+    pairs = {(x, y): False for x, y in product(x_coords, y_coords)}
+    for boundary in boundaries:
+        pairs[(boundary[0], boundary[1])] = True
+
+    assert all(pairs.values()), "The grid is incomplete: "+str(list(pairs.values()).count(False))+" tiles are missing"
+
+def get_ahn_grid_boundaries(ahn_folder):
+    tiles = _get_ahn_tiles(ahn_folder)
+    boundaries = [[tile.minx, tile.miny, tile.maxx, tile.maxy] for tile in tiles]
+    minx_values, miny_values, maxx_values, maxy_values = zip(*boundaries)
+    _check_tile_continuity(boundaries)
+    return min(minx_values), min(miny_values), max(maxx_values), max(maxy_values)
 
 

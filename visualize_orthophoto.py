@@ -2,6 +2,7 @@ import glob
 import matplotlib.pyplot as plt
 import rasterio
 import numpy as np
+from itertools import product
 
 
 class Orthophoto_Tile():
@@ -61,7 +62,7 @@ def _get_orthophoto_grid(orthophoto_tiles, minx, maxx, miny, maxy):
             dict_x = int((photo.minx - origin_x) / 1000)
             dict_y = int((photo.miny - origin_y) / 1000)
             orthophoto_grid[dict_x, dict_y] = photo
-    print("Orthophoto grid size created with number of tiles: " + str(len(orthophoto_grid)))
+    # print("Orthophoto grid size created with number of tiles: " + str(len(orthophoto_grid)))
     return orthophoto_grid
 
 
@@ -111,7 +112,7 @@ def _export_photo_subset(output_name, photo, minx, maxy, resolution):
             jpeg_quality=90  # 90 is usually visually indistinguishable from original
     ) as dst:
         dst.write(photo)
-        print("Saved output image to: " + output_name + ".tif")
+        # print("Saved output image to: " + output_name + ".tif")
 
 
 # Extracts tiles and forms the requested image.
@@ -138,3 +139,29 @@ def get_image(photo_folder, output_name, minx, miny, maxx, maxy):
         vertical_length - (maxy - lb_ver) * m_to_p)
     subset = stitched_image[miny_subset:maxy_subset, minx_subset:maxx_subset]
     _export_photo_subset(output_name, subset, minx, maxy, resolution)
+
+def _check_tile_continuity(boundaries):
+    # First check if there are now row or column gaps
+    x_coords = sorted(set([boundary[0] for boundary in boundaries]))
+    x_interval = [b - a for a, b in zip(x_coords, x_coords[1:])]
+    assert len(set(x_interval)) == 1, "A column of tiles is missing creating a gap"
+
+    y_coords = sorted(set([boundary[1] for boundary in boundaries]))
+    y_interval = [b - a for a, b in zip(y_coords, y_coords[1:])]
+    assert len(set(y_interval)) == 1, "A column of tiles is missing creating a gap"
+
+    # Create grid with tiles
+    pairs = {(x, y): False for x, y in product(x_coords, y_coords)}
+    for boundary in boundaries:
+        pairs[(boundary[0], boundary[1])] = True
+
+    assert all(pairs.values()), "The grid is incomplete: "+str(list(pairs.values()).count(False))+" tiles are missing"
+
+def get_orthophoto_grid_boundaries(orthophoto_folder):
+    tiles = _get_orthophoto_tiles(orthophoto_folder)
+    boundaries = [[tile.minx, tile.miny, tile.maxx, tile.maxy] for tile in tiles]
+    minx_values, miny_values, maxx_values, maxy_values = zip(*boundaries)
+    _check_tile_continuity(boundaries)
+    return min(minx_values), min(miny_values), max(maxx_values), max(maxy_values)
+
+
