@@ -8,6 +8,7 @@ from visualize_ahn import get_ahn_data, get_ahn_grid_boundaries
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import rasterio
+from rasterio.windows import Window
 import json
 
 
@@ -46,7 +47,7 @@ def visualize_orthophoto(orthophoto_file):
     plt.show()
 
 
-def visualize(AHN_file, BRT_file, class_map, orthophoto_file):
+def visualize(orthophoto_file, AHN_file, BRT_file, class_map):
     visualize_ahn(AHN_file)
     visualize_brt(BRT_file, class_map)
     visualize_orthophoto(orthophoto_file)
@@ -56,22 +57,22 @@ def _check_boundaries(minx, miny, maxx, maxy, ahn_folder, orthophoto_folder, gml
     assert miny < maxy, 'Min y must be less than max y'
 
     ahn_boundaries = get_ahn_grid_boundaries(ahn_folder)
-    assert minx > ahn_boundaries[0], 'Min x must be more than ahn boundaries min x'
-    assert miny > ahn_boundaries[1], 'Min y must be more than ahn boundaries min y'
-    assert maxx < ahn_boundaries[2], 'Max x must be less than ahn boundaries max x'
-    assert maxy < ahn_boundaries[3], 'Max y must be less than ahn boundaries max y'
+    assert minx >= ahn_boundaries[0], 'Min x must be more than ahn boundaries min x'
+    assert miny >= ahn_boundaries[1], 'Min y must be more than ahn boundaries min y'
+    assert maxx <= ahn_boundaries[2], 'Max x must be less than ahn boundaries max x'
+    assert maxy <= ahn_boundaries[3], 'Max y must be less than ahn boundaries max y'
 
     ortho_boundaries = get_orthophoto_grid_boundaries(orthophoto_folder)
-    assert minx > ortho_boundaries[0], 'Min x must be more than ortho boundaries min x'
-    assert miny > ortho_boundaries[1], 'Min y must be more than ortho boundaries min y'
-    assert maxx < ortho_boundaries[2], 'Max x must be less than ortho boundaries max x'
-    assert maxy < ortho_boundaries[3], 'Max y must be less than ortho boundaries max y'
+    assert minx >= ortho_boundaries[0], 'Min x must be more than ortho boundaries min x'
+    assert miny >= ortho_boundaries[1], 'Min y must be more than ortho boundaries min y'
+    assert maxx <= ortho_boundaries[2], 'Max x must be less than ortho boundaries max x'
+    assert maxy <= ortho_boundaries[3], 'Max y must be less than ortho boundaries max y'
 
     brt_boundaries = get_brt_boundaries(gml_files_location)
-    assert minx > brt_boundaries[0], 'Min x must be more than brt boundaries min x'
-    assert miny > brt_boundaries[1], 'Min y must be more than brt boundaries min y'
-    assert maxx < brt_boundaries[2], 'Max x must be less than brt boundaries max x'
-    assert maxy < brt_boundaries[3], 'Max y must be less than brt boundaries max y'
+    assert minx >= brt_boundaries[0], 'Min x must be more than brt boundaries min x'
+    assert miny >= brt_boundaries[1], 'Min y must be more than brt boundaries min y'
+    assert maxx <= brt_boundaries[2], 'Max x must be less than brt boundaries max x'
+    assert maxy <= brt_boundaries[3], 'Max y must be less than brt boundaries max y'
 
     # Display the smallest bounds of the input data
     bounds_minx = max(ahn_boundaries[0], ortho_boundaries[0], brt_boundaries[0])
@@ -99,14 +100,59 @@ def export_tiles(minx, miny, maxx, maxy, output_name, ahn_folder, orthophoto_fol
         create_BRT_export(gml_files_location, resolution, output_name + "/brt/" + str(index), minx, miny, maxx, maxy)
 
 
+def create_patches(input_folder, dimension, output_folder):
+    # Load input folders
+    folders = ["/ortho/", "/dsm/", "/brt/"]
+    ortho_tiles = os.listdir(input_folder + "/ortho/")
+    dsm_tiles = os.listdir(input_folder + "/dsm/")
+    brt_tiles = os.listdir(input_folder + "/brt/")
+
+    # Create output folders
+    os.makedirs(os.path.dirname(output_folder + "/dsm/"), exist_ok=True)
+    os.makedirs(os.path.dirname(output_folder + "/ortho/"), exist_ok=True)
+    os.makedirs(os.path.dirname(output_folder + "/brt/"), exist_ok=True)
+
+    # Go over all tiles
+    for modality, folder in zip([ortho_tiles, dsm_tiles, brt_tiles], folders):
+        index = 1
+        for tile in modality:
+            with rasterio.open(input_folder + folder + tile) as src:
+                width = src.width
+                height = src.height
+                x_steps = width // dimension
+                y_steps = height // dimension
+                total_patches = x_steps * y_steps
+
+                for i in tqdm(range(total_patches), desc=f"Creating patches of {tile} of modality {folder}", unit="patch", leave=False):
+                    x = i % x_steps
+                    y = i // x_steps
+
+                    window = Window(x * dimension, y * dimension, dimension, dimension)
+                    patch = src.read(window=window)
+                    transform = src.window_transform(window)
+
+                    profile = src.profile
+                    profile.update({
+                        "height": patch.shape[1],
+                        "width": patch.shape[2],
+                        "transform": transform
+                    })
+
+                    with rasterio.open(output_folder + folder + str(index) + ".tif", "w", **profile) as dst:
+                        dst.write(patch)
+
+                    index += 1
+
+
 if __name__ == '__main__':
 
-    start_x = 252000  # Minimum = 251000
-    start_y = 472000  # Minimum = 471000
-    interval = 200
-    size = 200
-    horizontal = 10
-    vertical = 5
+    file_location = "test_export"
+    start_x = 251000  # Minimum = 251000
+    start_y = 471000  # Minimum = 471000
+    interval = 1000
+    size = 1000
+    horizontal = 7
+    vertical = 8
 
     bounds = [[start_x + i*interval, start_y + i*interval, start_x + size + i*interval, start_y + size + i*interval] for i in range(horizontal) for j in range(vertical)]
 
@@ -117,7 +163,14 @@ if __name__ == '__main__':
     resolution = 0.05
     gml_files_location = ["Data/BRT/top10nl_terrein.gml", "Data/BRT/top10nl_waterdeel.gml",
                           "Data/BRT/top10nl_spoorbaandeel.gml", "Data/BRT/top10nl_wegdeel.gml"]
-    file_location = "test_export"
+
 
     export_tiles(minx, miny, maxx, maxy, file_location, ahn_folder, orthophoto_folder, resolution, gml_files_location)
+
+    output_folder = "dataset"
+    create_patches(file_location, 512, output_folder)
+
+    # index = 45
+    # visualize(f"dataset/ortho/{index}.tif", f"dataset/dsm/{index}.tif", f"dataset/brt/{index}.tif", "Data/BRT/class_map.json")
+
 

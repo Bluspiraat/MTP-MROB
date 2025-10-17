@@ -6,10 +6,6 @@ from rasterio.transform import from_origin
 import json
 import numpy as np
 
-from osgeo import gdal
-gdal.PushErrorHandler('CPLQuietErrorHandler')
-
-
 def _get_dictionaries():
     # Input dictionaries
     class_map_file = "Data/BRT/class_map.json"
