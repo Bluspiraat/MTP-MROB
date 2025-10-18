@@ -5,13 +5,12 @@
 	"unhardened": 3,
 	"track": 4,
 	"fallow": 5,
-	"built": 6,
-	"agriculture": 7,
-	"forest": 8,
-	"grassland": 9,
-	"heath": 10,
-	"dune": 11,
-	"sand": 12,
-	"water": 13,
-	"other": 14
+	"agriculture": 6,
+	"forest": 7,
+	"grassland": 8,
+	"heath": 9,
+	"dune": 10,
+	"sand": 11,
+	"water": 12,
+	"other": 13
 }

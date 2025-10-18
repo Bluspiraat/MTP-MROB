@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import rasterio
 from rasterio.windows import Window
-import json
 
 
 def visualize_ahn(ahn_file):
@@ -23,8 +22,7 @@ def visualize_ahn(ahn_file):
 
 def visualize_brt(brt_file, class_map_file):
     colors = [
-        "white", "black", "dimgray", "darkgray", "darkmagenta",
-        "darkred", "firebrick", "orange", "forestgreen", "lightgreen",
+        "white", "black", "dimgray", "darkgray", "darkmagenta", "firebrick", "orange", "forestgreen", "lightgreen",
         "darkorchid", "darkkhaki", "khaki", "lightskyblue", "peru"
     ]
     cmap = mcolors.ListedColormap(colors)
@@ -90,14 +88,14 @@ def export_tiles(minx, miny, maxx, maxy, output_name, ahn_folder, orthophoto_fol
     os.makedirs(os.path.dirname(output_name + "/ortho/"), exist_ok=True)
     os.makedirs(os.path.dirname(output_name + "/brt/"), exist_ok=True)
 
-    for minx, miny, maxx, maxy, index in tqdm(
+    for minx_tile, miny_tile, maxx_tile, maxy_tile, index in tqdm(
             zip(minx, miny, maxx, maxy, index),
             total=len(index),  # tells tqdm how many iterations to expect
             desc="Processing tiles"
     ):
-        get_ahn_data(ahn_folder, output_name + "/dsm/" + str(index), minx, miny, maxx, maxy)
-        get_image(orthophoto_folder, output_name + "/ortho/" + str(index), minx, miny, maxx, maxy)
-        create_BRT_export(gml_files_location, resolution, output_name + "/brt/" + str(index), minx, miny, maxx, maxy)
+        get_ahn_data(ahn_folder, output_name + "/dsm/" + str(index), minx_tile, miny_tile, maxx_tile, maxy_tile)
+        get_image(orthophoto_folder, output_name + "/ortho/" + str(index), minx_tile, miny_tile, maxx_tile, maxy_tile)
+        create_BRT_export(gml_files_location, resolution, output_name + "/brt/" + str(index), minx_tile, miny_tile, maxx_tile, maxy_tile)
 
 
 def create_patches(input_folder, dimension, output_folder):
@@ -146,15 +144,15 @@ def create_patches(input_folder, dimension, output_folder):
 
 if __name__ == '__main__':
 
-    file_location = "test_export"
-    start_x = 251000  # Minimum = 251000
-    start_y = 471000  # Minimum = 471000
+    file_location = "C:/MTP-Data/test_export"
+    start_x = 251000  # Minimum = 251000, maximum = 259000
+    start_y = 471000  # Minimum = 471000, maximum = 478000
     interval = 1000
     size = 1000
-    horizontal = 7
-    vertical = 8
+    horizontal = 8
+    vertical = 7
 
-    bounds = [[start_x + i*interval, start_y + i*interval, start_x + size + i*interval, start_y + size + i*interval] for i in range(horizontal) for j in range(vertical)]
+    bounds = [[start_x + i*interval, start_y + j*interval, start_x + size + i*interval, start_y + size + j*interval] for i in range(horizontal) for j in range(vertical)]
 
     minx, miny, maxx, maxy = zip(*bounds)
 
@@ -164,13 +162,12 @@ if __name__ == '__main__':
     gml_files_location = ["Data/BRT/top10nl_terrein.gml", "Data/BRT/top10nl_waterdeel.gml",
                           "Data/BRT/top10nl_spoorbaandeel.gml", "Data/BRT/top10nl_wegdeel.gml"]
 
-
     export_tiles(minx, miny, maxx, maxy, file_location, ahn_folder, orthophoto_folder, resolution, gml_files_location)
 
-    output_folder = "dataset"
-    create_patches(file_location, 512, output_folder)
+    # output_folder = "dataset"
+    # create_patches(file_location, 512, output_folder)
 
-    # index = 45
+    # index = 622
     # visualize(f"dataset/ortho/{index}.tif", f"dataset/dsm/{index}.tif", f"dataset/brt/{index}.tif", "Data/BRT/class_map.json")
 
 
