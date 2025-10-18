@@ -1,4 +1,8 @@
 Data/AHN and Ortho
 Data/BRT/*.gml
 Data/BRT/*.gfs
+dataset/
+test/
+test_export
 .venv/
+pixel_count.json
