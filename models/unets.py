@@ -8,7 +8,7 @@ class EarlyFusionUNet(nn.Module):
     Concatenates DSM as an additional input channel to RGB before feeding into a pretrained encoder.
     Works with any input size (multiples of 32)."""
 
-    def __init__(self, n_classes=15, encoder_name='resnet34', pretrained=True):
+    def __init__(self, n_classes=14, encoder_name='resnet34', pretrained=True):
         super().__init__()  # Make sure that it inherits information from the PyTorch Module class. It calls the
         # __init__ of nn.Modules
 
@@ -28,23 +28,22 @@ class EarlyFusionUNet(nn.Module):
         return logits
 
 
-class RGBUnet(nn.Module):
+class RGBUNet(nn.Module):
     """U-Net without any fusion.
      Works with any input size (multiples of 32)."""
 
-    def __init__(self, n_classes=15, encoder_name='resnet34', pretrained=True):
+    def __init__(self, n_classes=14, encoder_name='resnet34', pretrained=True):
         super().__init__()
 
         weights = 'imagenet' if pretrained else None
         self.model = smp.Unet(
             encoder_name=encoder_name,
             encoder_weights=weights,
-            in_channels=3,  # 3 RGB + 1 DSM
+            in_channels=3,  # 3 RGB
             classes=n_classes
         )
 
     def forward(self, rgb):
-        # Early fusion: concatenate DSM to RGB along the channel dimension
         logits = self.model(rgb)
         return logits
 
@@ -53,7 +52,7 @@ class PretrainedMidFusionUNet(nn.Module):
     """Dual-encoder U-Net for RGB + DSM fusion (mid-level fusion).
     Works with variable input sizes (multiples of 32)."""
 
-    def __init__(self, n_classes=15, rgb_encoder='resnet34', dsm_encoder='resnet18'):
+    def __init__(self, n_classes=14, rgb_encoder='resnet34', dsm_encoder='resnet18'):
         super().__init__()
 
         # Encoders
@@ -89,24 +88,3 @@ class PretrainedMidFusionUNet(nn.Module):
         x = self.decoder(*fused_feats)
         logits = self.segmentation_head(x)
         return logits
-
-
-if __name__ == "__main__":
-    # # Example with early fusion
-    # model_early = EarlyFusionUNet(n_classes=15)
-    rgb = torch.randn(1, 3, 640, 640)
-    dsm = torch.randn(1, 1, 640, 640)
-    # out_early = model_early(rgb, dsm)
-    # print("Early fusion output:", out_early.shape)
-    #
-    # # Example with RGB only
-    # model_RGB = RGBUnet(n_classes=15)
-    # rgb = torch.randn(1, 3, 640, 640)
-    # dsm = torch.randn(1, 1, 640, 640)
-    # out_rgb = model_RGB(rgb)
-    # print("RGB output:", out_rgb.shape)
-
-    # Example with mid fusion
-    model_mid = PretrainedMidFusionUNet(n_classes=15)
-    out_mid = model_mid(rgb, dsm)
-    print("Mid fusion output:", out_mid.shape)
