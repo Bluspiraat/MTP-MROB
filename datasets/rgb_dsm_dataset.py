@@ -46,16 +46,16 @@ class RGBDSMDataset(Dataset):
         return rgb, dsm, mask
 
 class RGBDataset(Dataset):
-    def __init__(self, rgb_dir, mask_dir, transform=None):
+    def __init__(self, rgb_dir, mask_dir, transform=None, normalization=None):
         self.rgb_dir = rgb_dir
         self.mask_dir = mask_dir
         self.transform = transform
+        self.normalization = normalization
         self.ids = [f.split('.')[0] for f in os.listdir(rgb_dir) if f.endswith('.tif')]
 
     def __len__(self):
         return len(self.ids)
 
-    #ToDo: Normalize for ResNet network
     def _convert_rgb(self, file_location):
         with rasterio.open(file_location) as src:
             rgb = src.read()
@@ -76,5 +76,9 @@ class RGBDataset(Dataset):
 
         if self.transform:
             rgb, mask = self.transform(rgb, mask)
+
+        # Assumes values are in range of [0, 1]
+        if self.normalization:
+            rgb = self.normalization(rgb)
 
         return rgb, mask
