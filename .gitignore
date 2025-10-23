@@ -1,4 +1,5 @@
 Data/AHN and Ortho
 Data/BRT/*.gml
 Data/BRT/*.gfs
+/trained_models/
 .venv/
