@@ -2,6 +2,7 @@ import torch
 from tqdm import tqdm
 from .metrics import dice_score_multiclass
 
+
 def validate_one_epoch(model, dataloader, criterion, device, num_classes):
     model.eval()
     running_loss = 0.0

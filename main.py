@@ -1,6 +1,7 @@
 from datasets import RGBDataset
 from torch.utils.data import DataLoader, random_split, Subset
 from models import RGBUNet
+from torchvision.transforms import transforms
 from train import metrics
 import torch
 import matplotlib.pyplot as plt
@@ -29,7 +30,8 @@ if __name__ == '__main__':
     rgb_folder = "C:/MTP-Data/dataset_twente_512/ortho/"
     mask_folder = "C:/MTP-Data/dataset_twente_512/brt/"
     class_map = "Data/BRT/class_map.json"
-    dataset = RGBDataset(rgb_folder, mask_folder)
+    normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Values of ImageNet
+    dataset = RGBDataset(rgb_folder, mask_folder, normalization=normalization)
 
     num_epochs = 20
     best_val_loss = float('inf')
@@ -56,10 +58,6 @@ if __name__ == '__main__':
 
     # Setup model
     model = RGBUNet()
-
-    # Load existing model
-    # state_dict = torch.load("trained_models/rgb_unet_weights.pth", map_location='cpu')
-    # model.load_state_dict(state_dict)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)

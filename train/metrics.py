@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import json
 
+
 def dice_score_multiclass(preds, targets, num_classes, eps=1e-6):
     preds = F.softmax(preds, dim=1)
     preds_classes = preds.argmax(dim=1)  # [B,H,W]
