@@ -5,11 +5,12 @@ import numpy as np
 import rasterio
 
 class RGBDSMDataset(Dataset):
-    def __init__(self, rgb_dir, dsm_dir, mask_dir, transform=None):
+    def __init__(self, rgb_dir, dsm_dir, mask_dir, transform=None, normalization=None):
         self.rgb_dir = rgb_dir
         self.dsm_dir = dsm_dir
         self.mask_dir = mask_dir
         self.transform = transform
+        self.normalization = normalization
         self.ids = [f.split('.')[0] for f in os.listdir(rgb_dir) if f.endswith('.tif')]
 
     def __len__(self):
@@ -43,13 +44,17 @@ class RGBDSMDataset(Dataset):
         if self.transform:
             rgb, dsm, mask = self.transform(rgb, dsm, mask)
 
+        if self.normalization:
+            rgb = self.normalization(rgb)
+
         return rgb, dsm, mask
 
 class RGBDataset(Dataset):
-    def __init__(self, rgb_dir, mask_dir, transform=None, normalization=None):
+    def __init__(self, rgb_dir, mask_dir, geo_transform=None, rgb_transform=None, normalization=None):
         self.rgb_dir = rgb_dir
         self.mask_dir = mask_dir
-        self.transform = transform
+        self.geo_transform = geo_transform
+        self.rgb_transform = rgb_transform
         self.normalization = normalization
         self.ids = [f.split('.')[0] for f in os.listdir(rgb_dir) if f.endswith('.tif')]
 
@@ -58,27 +63,37 @@ class RGBDataset(Dataset):
 
     def _convert_rgb(self, file_location):
         with rasterio.open(file_location) as src:
-            rgb = src.read()
-            return rgb.astype(np.float32) / 255.0
+            rgb = src.read().astype(np.float32)/255.0
+            return rgb
 
     def _convert_mask(self, file_location):
         with rasterio.open(file_location) as src:
-            mask = src.read(1)
-            return mask.astype(np.int64)
+            mask = src.read(1).astype(np.int64)
+            return mask
 
     def __getitem__(self, idx):
         id_ = self.ids[idx]
-        rgb = self._convert_rgb(f'{self.rgb_dir}/{id_}.tif')
-        mask = self._convert_mask(f'{self.mask_dir}/{id_}.tif')
+        rgb = self._convert_rgb(f'{self.rgb_dir}/{id_}.tif')  # [3,H,W]
+        mask = self._convert_mask(f'{self.mask_dir}/{id_}.tif')  # [H,W]
 
-        rgb = torch.from_numpy(rgb)
-        mask = torch.from_numpy(mask)
+        # Albumentations expects HWC format
+        rgb = rgb.transpose(1, 2, 0)
 
-        if self.transform:
-            rgb, mask = self.transform(rgb, mask)
+        # Geometric changes
+        if self.geo_transform:
+            augmented = self.geo_transform(image=rgb, mask=mask)
+            rgb, mask = augmented["image"], augmented["mask"]
+
+        # Color distortions
+        if self.rgb_transform:
+            rgb = self.rgb_transform(image=rgb)["image"]
 
         # Assumes values are in range of [0, 1]
         if self.normalization:
-            rgb = self.normalization(rgb)
+            rgb = self.normalization(image=rgb)["image"]
+
+        # Convert to torch tensors
+        rgb = torch.tensor(rgb, dtype=torch.float32).permute(2, 0, 1)  # [3, H, W]
+        mask = torch.tensor(mask, dtype=torch.long)  # [H, W]
 
         return rgb, mask
