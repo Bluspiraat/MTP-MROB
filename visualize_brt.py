@@ -6,10 +6,7 @@ from rasterio.transform import from_origin
 import json
 import numpy as np
 
-def _get_dictionaries():
-    # Input dictionaries
-    class_map_file = "Data/BRT/class_map.json"
-    class_grouping_file = "Data/BRT/class_grouping.json"
+def _get_dictionaries(class_map_file, class_grouping_file):
 
     # Open the class map and grouping dictionaries
     with open(class_map_file, 'r') as f:
@@ -25,17 +22,21 @@ def _get_dictionaries():
 def _create_gdf_list(gmls, clip_geometry, class_grouping):
     gdf_list = []
     for gml_file, attribute in gmls:
-        gdf_new = gpd.read_file(gml_file)
-        if gdf_new.crs is None:
-            gdf_new = gdf_new.set_crs("EPSG:28992")
-        gdf_new = gdf_new.clip(clip_geometry)
-        attribute_count_old = len(gdf_new[attribute].unique())
-        gdf_new[attribute] = gdf_new[attribute].map(class_grouping)
-        attribute_count_new = len(gdf_new[attribute].unique())
-        # print("For file: " + str(gml_file) + " New bounds after clipping: " + str(
-        #     gdf_new.total_bounds) + ". The total number of distinct classes was: " + str(
-        #     attribute_count_old) + " and is now: " + str(attribute_count_new))
-        gdf_list.append(gdf_new)
+        # if the gml file is empty then an error is thrown and none is added to the geodataframes list
+        try:
+            gdf_new = gpd.read_file(gml_file)
+            if gdf_new.crs is None:
+                gdf_new = gdf_new.set_crs("EPSG:28992")
+            gdf_new = gdf_new.clip(clip_geometry)
+            attribute_count_old = len(gdf_new[attribute].unique())
+            gdf_new[attribute] = gdf_new[attribute].map(class_grouping)
+            attribute_count_new = len(gdf_new[attribute].unique())
+            # print("For file: " + str(gml_file) + " New bounds after clipping: " + str(
+            #     gdf_new.total_bounds) + ". The total number of distinct classes was: " + str(
+            #     attribute_count_old) + " and is now: " + str(attribute_count_new))
+            gdf_list.append(gdf_new)
+        except Exception as e:
+            gdf_list.append(None)
     return gdf_list
 
 
@@ -44,8 +45,11 @@ def _create_gdf_list(gmls, clip_geometry, class_grouping):
 def _obtain_shapes(gdf_list, gmls, class_map):
     shapes_list = []
     for gdf, gml in zip(gdf_list, gmls):
-        shapes_temp = ((geom, class_map[class_value]) for geom, class_value in zip(gdf.geometry, gdf[gml[1]]))
-        shapes_list.append(shapes_temp)
+        try:
+            shapes_temp = ((geom, class_map[class_value]) for geom, class_value in zip(gdf.geometry, gdf[gml[1]]))
+            shapes_list.append(shapes_temp)
+        except Exception as e:
+            pass
     # print("Converted all shapes to integer representations")
     return shapes_list
 
@@ -76,9 +80,19 @@ def _get_meta_data(height, width, final_raster, transform):
     }
     return meta_data
 
+def _safe_read_gml(gml_path):
+    try:
+        gdf = gpd.read_file(gml_path)
+        if gdf.empty:
+            print(f"Empty gml file {gml_path}")
+            return None
+        return gdf
+    except Exception as e:
+        print(f"Error reading gml file {gml_path}: {e}")
+
 
 # gml_files order: terrein, waterdeel, spoorbaandeel, wegdeel.
-def create_BRT_export(gml_files, resolution, output_name, minx, miny, maxx, maxy):
+def create_BRT_export(gml_files, resolution, output_name, minx, miny, maxx, maxy, class_grouping_file, class_map_file):
     gml_terrein = (gml_files[0], "typeLandgebruik")
     gml_waterdeel = (gml_files[1], "typeWater")
     gml_spoorbaandeel = (gml_files[2], "typeSpoorbaan")
@@ -86,7 +100,7 @@ def create_BRT_export(gml_files, resolution, output_name, minx, miny, maxx, maxy
     gmls = [gml_terrein, gml_waterdeel, gml_spoorbaandeel, gml_wegdeel]
 
     # Get dictionaries
-    class_map, class_grouping = _get_dictionaries()
+    class_map, class_grouping = _get_dictionaries(class_map_file=class_map_file, class_grouping_file=class_grouping_file)
 
     # Create clip geometry
     clip_geom = box(minx, miny, maxx, maxy)
@@ -119,18 +133,8 @@ def create_BRT_export(gml_files, resolution, output_name, minx, miny, maxx, maxy
     class_map_inverted = {v: k for k, v in class_map.items()}
     labels_present = [class_map_inverted[index] for index in unique_indices]
 
-    # print("Rasterized and merges all provided layers")
-    # print("Present labels are: " + str(labels_present))
-
-
-def get_brt_boundaries(gmls):
-    boundaries = [gpd.read_file(gml).total_bounds for gml in gmls]
-    minx = max([boundary[0] for boundary in boundaries])
-    miny = max([boundary[1] for boundary in boundaries])
-    maxx = min([boundary[2] for boundary in boundaries])
-    maxy = min([boundary[3] for boundary in boundaries])
-    return [minx, miny, maxx, maxy]
-
+    print("Rasterized and merges all provided layers")
+    print("Present labels are: " + str(labels_present))
 
 
 

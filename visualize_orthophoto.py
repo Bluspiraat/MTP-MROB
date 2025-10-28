@@ -7,23 +7,27 @@ from itertools import product
 
 class Orthophoto_Tile():
     def __init__(self, image_location):
+        self.image_location = image_location
         self.minx = 0
         self.miny = 0
         self.maxx = 0
         self.maxy = 0
-        self.size = 0
         self.resolution = 0
-        self.image_location = image_location
+        self.width_px = 0
+        self.width_px = 0
         self._extract_photo_information()
+        self.width_m = self.maxx - self.minx
+        self.height_m = self.maxy - self.miny
 
     def _extract_photo_information(self):
         with rasterio.open(self.image_location) as src:
-            self.size = src.width
             self.resolution = src.res[0]
             self.minx = int(src.bounds[0])
             self.miny = int(src.bounds[1])
             self.maxx = int(src.bounds[2])
             self.maxy = int(src.bounds[3])
+            self.width_px = src.width
+            self.height_px = src.height
 
     def converted_image(self):
         with rasterio.open(self.image_location) as src:
@@ -33,7 +37,7 @@ class Orthophoto_Tile():
         return converted_image
 
     def show_image(self):
-        extent = [self.minx, self.minx + self.size, self.miny, self.miny + self.size]
+        extent = [self.minx, self.minx + self.width_px, self.miny, self.miny + self.height_px]
         plt.imshow(self.converted_image(), extent=extent, origin="upper")
         plt.title("Orthophoto image")
         plt.xlabel("X - coordinates")
@@ -67,23 +71,23 @@ def _get_orthophoto_grid(orthophoto_tiles, minx, maxx, miny, maxy):
 
 
 # Create stitched image
-def _get_stitched_image(orthophoto_grid):
+def _get_stitched_image(orthophoto_grid, width_px, height_px):
     # Max indices for each dimension
     max_i = max(i for i, j in orthophoto_grid.keys())
     max_j = max(j for i, j in orthophoto_grid.keys())
 
     # Determine colums and row numbers
-    width = (max_i + 1) * 20000
-    height = (max_j + 1) * 20000
+    width = (max_i + 1) * width_px
+    height = (max_j + 1) * height_px
 
     stitched_image = np.zeros((height, width, 3), dtype=np.uint8)
 
     # place tiles: invert vertical index so j=0 (bottom) maps to bottom of array
     for (i, j), photo in orthophoto_grid.items():
-        row_start = (max_j - j) * 20000
-        col_start = i * 20000
-        stitched_image[row_start:row_start + 20000,
-        col_start:col_start + 20000] = photo.converted_image()
+        row_start = (max_j - j) * height_px
+        col_start = i * width_px
+        stitched_image[row_start:row_start + height_px,
+            col_start:col_start + width_px] = photo.converted_image()
 
     return stitched_image
 
@@ -118,27 +122,31 @@ def _export_photo_subset(output_name, photo, minx, maxy, resolution):
 # Extracts tiles and forms the requested image.
 def get_image(photo_folder, output_name, minx, miny, maxx, maxy):
     # Determine bounds (meters conversion to pixels count)
+    #ToDo: Check if the hardcoded 1000 meter value could pose a problem
     lb_hor = int(minx // 1000) * 1000
     lb_ver = int(miny // 1000) * 1000
 
     # Create orthophoto tiles
     orthophoto_tiles = _get_orthophoto_tiles(photo_folder)
+    width_px = orthophoto_tiles[0].width_px
+    height_px = orthophoto_tiles[0].height_px
 
     # Create orthophoto grid
     orthophoto_grid = _get_orthophoto_grid(orthophoto_tiles, minx, maxx, miny, maxy)
 
     # Create stitched image
-    stitched_image = _get_stitched_image(orthophoto_grid)
+    stitched_image = _get_stitched_image(orthophoto_grid, width_px, height_px)
     vertical_length = stitched_image.shape[0]
 
     # Subset the requested area
     resolution = orthophoto_tiles[0].resolution
-    m_to_p = int(1/orthophoto_tiles[0].resolution)
+    m_to_p = int(1 / orthophoto_tiles[0].resolution)
     minx_subset, maxx_subset = int((minx - lb_hor) * m_to_p), int((maxx - lb_hor) * m_to_p)
     maxy_subset, miny_subset = int(vertical_length - (miny - lb_ver) * m_to_p), int(
         vertical_length - (maxy - lb_ver) * m_to_p)
     subset = stitched_image[miny_subset:maxy_subset, minx_subset:maxx_subset]
     _export_photo_subset(output_name, subset, minx, maxy, resolution)
+
 
 def _check_tile_continuity(boundaries):
     # First check if there are now row or column gaps
@@ -155,7 +163,9 @@ def _check_tile_continuity(boundaries):
     for boundary in boundaries:
         pairs[(boundary[0], boundary[1])] = True
 
-    assert all(pairs.values()), "The grid is incomplete: "+str(list(pairs.values()).count(False))+" tiles are missing"
+    assert all(pairs.values()), "The grid is incomplete: " + str(
+        list(pairs.values()).count(False)) + " tiles are missing"
+
 
 def get_orthophoto_grid_boundaries(orthophoto_folder):
     tiles = _get_orthophoto_tiles(orthophoto_folder)
@@ -163,5 +173,3 @@ def get_orthophoto_grid_boundaries(orthophoto_folder):
     minx_values, miny_values, maxx_values, maxy_values = zip(*boundaries)
     _check_tile_continuity(boundaries)
     return min(minx_values), min(miny_values), max(maxx_values), max(maxy_values)
-
-

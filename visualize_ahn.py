@@ -65,15 +65,23 @@ def _get_ahn_grid(ahn_tiles, minx, miny, maxx, maxy):
             dict_x = int((tile.minx - origin_x) / width_m)
             dict_y = int((tile.miny - origin_y) / height_m)
             ahn_grid[dict_x, dict_y] = tile
-    # print("AHN grid size created with number of tiles: " + str(len(ahn_grid)))
-    return ahn_grid
+
+    # Shift tiles such that the origin is at 0
+    ahn_grid_x_min = min(x for x, y in ahn_grid.keys())
+    ahn_grid_y_min = min(y for x, y in ahn_grid.keys())
+
+    ahn_grid_shifted = {}
+    for x, y in ahn_grid.keys():
+        ahn_grid_shifted[(x-ahn_grid_x_min, y-ahn_grid_y_min)] = ahn_grid[(x, y)]
+
+    return ahn_grid_shifted
 
 
 def _get_stitched_ahn(ahn_grid):
     max_i = max(i for i, j in ahn_grid.keys())
     max_j = max(j for i, j in ahn_grid.keys())
 
-    # Calculate height and width of a patch for all patches/tiles
+    # Calculate height and width of input data for all tiles
     ahn_tile_example = next(iter(ahn_grid.values()))
     width = int((max_i + 1) * ahn_tile_example.width)
     height = int((max_j + 1) * ahn_tile_example.height)
@@ -89,6 +97,7 @@ def _get_stitched_ahn(ahn_grid):
         stitched_image[row_start:row_start + tile_data.shape[0], col_start:col_start + tile_data.shape[1]] = tile_data
 
     return stitched_image
+
 
 def _export_ahn_subset(output_name, ahn_grid, minx, maxy, resolution):
     crs = "EPSG:28992"
@@ -134,7 +143,7 @@ def get_ahn_data(ahn_file_folder, output_name, minx, miny, maxx, maxy):
     subset = stitched_image[miny_subset:maxy_subset, minx_subset:maxx_subset]
 
     # Upscale image and increase resolution
-    zoom_factor = 10
+    zoom_factor = 5
     subset_highres = zoom(subset, zoom_factor, order=1)
 
     _export_ahn_subset(output_name, subset_highres, minx, maxy, res/zoom_factor)
