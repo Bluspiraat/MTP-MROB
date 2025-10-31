@@ -1,4 +1,5 @@
 import albumentations as A
+import cv2
 from albumentations.pytorch import ToTensorV2
 
 
@@ -7,8 +8,15 @@ def get_geometric_transform():
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
-        A.Affine(translate_percent=(-0.05, 0.05), scale=(0.9, 1.1), rotate=(-10, 10), p=0.5)
-    ])
+        A.Affine(translate_percent=(-0.05, 0.05),
+                 scale=(0.9, 1.1),
+                 rotate=(-10, 10),
+                 p=0.5,
+                 border_mode=cv2.BORDER_CONSTANT,
+                 fill=-1)
+    ],
+        additional_targets={'dsm': 'image'}
+    )
 
 
 def get_rgb_transform():

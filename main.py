@@ -1,4 +1,4 @@
-from datasets import RGBDataset
+from datasets import RGBDataset, RGBDSMDataset
 from datasets.augmentations import get_image_net_normalization, get_rgb_transform, get_geometric_transform
 from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
 from models import RGBUNet
@@ -13,6 +13,7 @@ import json
 from tqdm import tqdm
 import os
 
+
 def show_class_image(class_data, title):
     colors = [
         "white", "black", "dimgray", "darkgray", "darkmagenta",
@@ -25,14 +26,24 @@ def show_class_image(class_data, title):
     plt.imshow(class_data, cmap, vmin=0, vmax=13)
     plt.title(title)
 
-def create_datasets_splits(folders, splits, seed):
+
+def create_datasets_splits(folders, splits, seed, DSM=False):
     datasets = []
-    for folder in folders:
-        datasets.append(RGBDataset(rgb_dir=f'{folder}/ortho/',
-                             mask_dir=f'{folder}/brt/',
-                             normalization=get_image_net_normalization(),
-                             geo_transform=get_geometric_transform(),
-                             rgb_transform=get_rgb_transform()))
+    if DSM:
+        for folder in folders:
+            datasets.append(RGBDSMDataset(rgb_dir=f'{folder}/ortho/',
+                                 dsm_dir=f'{folder}/dsm/',
+                                 mask_dir=f'{folder}/brt/',
+                                 normalization=get_image_net_normalization(),
+                                 geo_transform=get_geometric_transform(),
+                                 rgb_transform=get_rgb_transform()))
+    else:
+        for folder in folders:
+            datasets.append(RGBDataset(rgb_dir=f'{folder}/ortho/',
+                                 mask_dir=f'{folder}/brt/',
+                                 normalization=get_image_net_normalization(),
+                                 geo_transform=get_geometric_transform(),
+                                 rgb_transform=get_rgb_transform()))
     train_sets = []
     validation_sets = []
     test_sets = []
@@ -72,9 +83,9 @@ if __name__ == '__main__':
 
     # Split datasets
     train_set, val_set, test_set = create_datasets_splits(data_folders, splits, split_seed)
-    train_batches = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    validation_batches = DataLoader(val_set, batch_size=batch_size, shuffle=True)
-    test_batches = DataLoader(test_set, batch_size=batch_size, shuffle=True)
+    train_batches = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4, prefetch_factor=2, pin_memory=True)
+    validation_batches = DataLoader(val_set, batch_size=batch_size, shuffle=True , num_workers=4, prefetch_factor=2, pin_memory=True)
+    test_batches = DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=4, prefetch_factor=2, pin_memory=True)
 
     # Setup model
     model = RGBUNet()
@@ -110,6 +121,8 @@ if __name__ == '__main__':
                     json.dump(history, f)
             else:
                 patience_counter += 1
+                with open(f"{save_name}.json", 'w') as f:
+                    json.dump(history, f)
                 if patience_counter >= patience_limit:
                     tqdm.write("Early stopping triggered.")
                     break

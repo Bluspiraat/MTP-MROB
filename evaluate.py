@@ -2,7 +2,8 @@ import json
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import torch
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
+from datasets.augmentations import get_image_net_normalization, get_rgb_transform, get_geometric_transform
 import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
@@ -105,49 +106,68 @@ def plot_confusion_matrix(cm, class_names):
 
 def evaluate_per_class_accuracy(model, dataloader, device, class_names):
     model.eval()
-    all_preds = []
-    all_labels = []
+    num_classes = len(class_names)
+    cm = np.zeros((num_classes, num_classes), dtype=np.int64)
 
     with torch.no_grad():
-        for images, labels in dataloader:
+        for images, labels in tqdm(dataloader, desc="Evaluating", leave=False):
             images = images.to(device)
             labels = labels.to(device)
 
             outputs = model(images)
             preds = torch.argmax(outputs, dim=1)
 
-            all_preds.append(preds.cpu())
-            all_labels.append(labels.cpu())
+            # Move to CPU for NumPy
+            y_true = labels.cpu().numpy().ravel()
+            y_pred = preds.cpu().numpy().ravel()
 
-    all_preds = torch.cat(all_preds, dim=0)
-    all_labels = torch.cat(all_labels, dim=0)
+            # Update confusion matrix
+            cm += confusion_matrix(
+                y_true, y_pred, labels=np.arange(num_classes)
+            )
 
-    y_pred = all_preds.numpy().ravel()
-    y_true = all_labels.numpy().ravel()
+            del images, labels, outputs, preds
+            torch.cuda.empty_cache()
 
-    num_classes = len(class_names)
-    cm = confusion_matrix(y_true, y_pred, labels=np.arange(num_classes))
-
+    # Compute accuracies
     with np.errstate(divide='ignore', invalid='ignore'):
         per_class_acc = np.diag(cm) / cm.sum(axis=1)
         per_class_acc = np.nan_to_num(per_class_acc)
-
     mean_acc = np.mean(per_class_acc)
 
     plot_confusion_matrix(cm, class_names)
+    return per_class_acc, mean_acc, cm
 
-    return per_class_acc, mean_acc, cm, y_true, y_pred
+
+def create_datasets_splits(folders, splits, seed):
+    datasets = []
+    for folder in folders:
+        datasets.append(RGBDataset(rgb_dir=f'{folder}/ortho/',
+                             mask_dir=f'{folder}/brt/',
+                             normalization=get_image_net_normalization()))
+    train_sets = []
+    validation_sets = []
+    test_sets = []
+    for dataset in datasets:
+        train_set_temp, validation_set_temp, test_set_temp = random_split(dataset, splits,
+                                                                          generator=torch.Generator().manual_seed(seed))
+        train_sets.append(train_set_temp)
+        validation_sets.append(validation_set_temp)
+        test_sets.append(test_set_temp)
+    return ConcatDataset(train_sets), ConcatDataset(validation_sets), ConcatDataset(test_sets)
+
 
 
 if __name__ == '__main__':
-    model_weights = "C:/MTP-Code/trained_models/rgb_unet_7_10000.pth"
-    loss_location = "C:/MTP-Code/trained_models/rgb_unet_7_10000.json"
-    title = "40000 images, batch size 4"
+    model_weights = "C:/MTP-Code/trained_models/rgb_unet_varied_full.pth"
+    loss_location = "C:/MTP-Code/trained_models/rgb_unet_varied_full.json"
+    data_folders = ["C:/MTP-Data/dataset_diverse_2022_512/bies_bosch",
+                    "C:/MTP-Data/dataset_diverse_2022_512/schoorl",
+                    "C:/MTP-Data/dataset_diverse_2022_512/vierhouten",
+                    "C:/MTP-Data/dataset_diverse_2022_512/soesterberg"]
+    title = "full dataset, batch size 8"
     class_map = "C:/MTP-Code/Data/BRT/class_map.json"
     color_map = "C:/MTP-Code/Data/BRT/class_to_color.json"
-    rgb_folder = "C:/MTP-Data/dataset_twente_512/ortho/"
-    mask_folder = "C:/MTP-Data/dataset_twente_512/brt/"
-    subset_size = 1000
     plot_examples = 20
 
     with open(class_map, 'r') as f:
@@ -165,14 +185,11 @@ if __name__ == '__main__':
     model.to(device)
 
     # Setup dataloader
-    dataset = RGBDataset(rgb_folder, mask_folder)
-    train_set, val_set, test_set = random_split(dataset, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(43))
+    train_set, val_set, test_set = create_datasets_splits(folders=data_folders, splits=[0.8, 0.1, 0.1], seed=43)
 
     # Subset train and test set
-    subset_indices_test = list(range(4 * subset_size))
-    test_subset = Subset(train_set, subset_indices_test)
-    test_batches = DataLoader(test_subset, batch_size=4, shuffle=True, num_workers=4)
+    test_batches = DataLoader(test_set, batch_size=4, shuffle=True, num_workers=4)
 
     plot_loss(loss_location, title)
-    per_class_acc, mean_acc, cm, y_true, y_pred = evaluate_per_class_accuracy(model, test_batches, device, classes)
+    per_class_acc, mean_acc, cm = evaluate_per_class_accuracy(model, test_batches, device, classes)
     show_predictions(model, test_batches, device, num_examples=plot_examples, class_colors=colors)
