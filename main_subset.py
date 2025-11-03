@@ -145,12 +145,12 @@ def create_patches(input_folder, dimension, output_folder):
 
 if __name__ == '__main__':
 
-    tiles_output_folder = "C:/MTP-Data/datasets/soesterberg_tiles"
-    patches_output_folder = "C:/MTP-Data/datasets/soesterberg_patches"
+    tiles_output_folder = "C:/MTP-Data/datasets/bies_bosch_tiles"
+    patches_output_folder = "C:/MTP-Data/datasets/bies_bosch_patches"
     class_map_file = "C:/MTP-Data/raw_datasets_2022/class_map.json"
     class_grouping_file = "C:/MTP-Data/raw_datasets_2022/class_grouping.json"
-    start_x = 149000
-    start_y = 455000
+    start_x = 110000
+    start_y = 416000
     interval = 1000  # Meter size
     size = 1000  # Meter size
     horizontal = 7
@@ -160,27 +160,27 @@ if __name__ == '__main__':
 
     minx, miny, maxx, maxy = zip(*bounds)
 
-    ahn_folder = "C:/MTP-Data/raw_datasets_2022/soesterberg/ahn/"
-    orthophoto_folder = "C:/MTP-Data/raw_datasets_2022/soesterberg/ortho/"
+    ahn_folder = "C:/MTP-Data/raw_datasets_2022/bies_bosch/ahn/"
+    orthophoto_folder = "C:/MTP-Data/raw_datasets_2022/bies_bosch/ortho/"
     resolution = 0.1
-    gml_files_location = ["C:/MTP-Data/raw_datasets_2022/soesterberg/brt/top10nl_terrein.gml",
-                          "C:/MTP-Data/raw_datasets_2022/soesterberg/brt/top10nl_waterdeel.gml",
-                          "C:/MTP-Data/raw_datasets_2022/soesterberg/brt/top10nl_spoorbaandeel.gml",
-                          "C:/MTP-Data/raw_datasets_2022/soesterberg/brt/top10nl_wegdeel.gml"]
+    gml_files_location = ["C:/MTP-Data/raw_datasets_2022/bies_bosch/brt/top10nl_terrein.gml",
+                          "C:/MTP-Data/raw_datasets_2022/bies_bosch/brt/top10nl_waterdeel.gml",
+                          "C:/MTP-Data/raw_datasets_2022/bies_bosch/brt/top10nl_spoorbaandeel.gml",
+                          "C:/MTP-Data/raw_datasets_2022/bies_bosch/brt/top10nl_wegdeel.gml"]
 
     # export_tiles(minx, miny, maxx, maxy, tiles_output_folder, ahn_folder, orthophoto_folder, resolution,
     #              gml_files_location, class_grouping_file=class_grouping_file, class_map_file=class_map_file)
     #
-    # create_patches(tiles_output_folder, 512, patches_output_folder)
+    create_patches(tiles_output_folder, 512, patches_output_folder)
 
-    samples = 10
-    dataset_folder = "C:/MTP-Data/dataset_diverse_2022_512/soesterberg"
-    indices = [random.randint(0, 14000) for _ in range(samples)]
-
-    for index in indices:
-        visualize(f"{dataset_folder}/ortho/{index}.tif",
-                  f"{dataset_folder}/dsm/{index}.tif",
-                  f"{dataset_folder}/brt/{index}.tif",
-                  "C:/MTP-Data/raw_datasets_2022/class_to_color.json")
+    # samples = 10
+    # dataset_folder = "C:/MTP-Data/dataset_diverse_2022_512/soesterberg"
+    # indices = [random.randint(0, 14000) for _ in range(samples)]
+    #
+    # for index in indices:
+    #     visualize(f"{dataset_folder}/ortho/{index}.tif",
+    #               f"{dataset_folder}/dsm/{index}.tif",
+    #               f"{dataset_folder}/brt/{index}.tif",
+    #               "C:/MTP-Data/raw_datasets_2022/class_to_color.json")
 
 
