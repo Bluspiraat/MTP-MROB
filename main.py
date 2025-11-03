@@ -4,69 +4,17 @@ from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
 from models import RGBUNet
 from train import metrics
 import torch
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from train.loss import ComboLoss
 from train.train import train_one_epoch
 from train.validate import validate_one_epoch
 import json
 from tqdm import tqdm
-import os
-
-
-def show_class_image(class_data, title):
-    colors = [
-        "white", "black", "dimgray", "darkgray", "darkmagenta",
-        "darkred", "firebrick", "orange", "forestgreen", "lightgreen",
-        "darkorchid", "darkkhaki", "khaki", "lightskyblue", "peru"
-    ]
-    # labels = colors
-    cmap = mcolors.ListedColormap(colors)
-
-    plt.imshow(class_data, cmap, vmin=0, vmax=13)
-    plt.title(title)
-
-
-def create_datasets_splits(folders, splits, seed, DSM=False):
-    datasets = []
-    if DSM:
-        for folder in folders:
-            datasets.append(RGBDSMDataset(rgb_dir=f'{folder}/ortho/',
-                                 dsm_dir=f'{folder}/dsm/',
-                                 mask_dir=f'{folder}/brt/',
-                                 normalization=get_image_net_normalization(),
-                                 geo_transform=get_geometric_transform(),
-                                 rgb_transform=get_rgb_transform()))
-    else:
-        for folder in folders:
-            datasets.append(RGBDataset(rgb_dir=f'{folder}/ortho/',
-                                 mask_dir=f'{folder}/brt/',
-                                 normalization=get_image_net_normalization(),
-                                 geo_transform=get_geometric_transform(),
-                                 rgb_transform=get_rgb_transform()))
-    train_sets = []
-    validation_sets = []
-    test_sets = []
-    for dataset in datasets:
-        train_set_temp, validation_set_temp, test_set_temp = random_split(dataset, splits,
-                                                                          generator=torch.Generator().manual_seed(seed))
-        train_sets.append(train_set_temp)
-        validation_sets.append(validation_set_temp)
-        test_sets.append(test_set_temp)
-    return ConcatDataset(train_sets), ConcatDataset(validation_sets), ConcatDataset(test_sets)
-
-
 
 if __name__ == '__main__':
 
     # Load data
-    data_folders = ["C:/MTP-Data/dataset_diverse_2022_512/bies_bosch",
-                    "C:/MTP-Data/dataset_diverse_2022_512/schoorl",
-                    "C:/MTP-Data/dataset_diverse_2022_512/vierhouten",
-                    "C:/MTP-Data/dataset_diverse_2022_512/soesterberg"]
-    rgb_folder = "C:/MTP-Data/dataset_twente_512/ortho/"
-    mask_folder = "C:/MTP-Data/dataset_twente_512/brt/"
-    class_map = "Data/BRT/class_map.json"
+    train_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/train"
+    val_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/val"
 
     num_epochs = 20
     best_val_loss = float('inf')
@@ -78,14 +26,20 @@ if __name__ == '__main__':
     batch_size = 4
     alpha = 0.5
     learning_rate = 1e-4
-    splits = [0.8, 0.1, 0.1]
-    split_seed = 43
 
-    # Split datasets
-    train_set, val_set, test_set = create_datasets_splits(data_folders, splits, split_seed)
+    # Load dataset
+    train_set = RGBDataset(rgb_dir=f'{train_folder}/ortho/',
+                           mask_dir=f'{train_folder}/brt/',
+                           normalization=get_image_net_normalization(),
+                           geo_transform=get_geometric_transform(),
+                           rgb_transform=get_rgb_transform())
+    val_set = RGBDataset(rgb_dir=f'{val_folder}/ortho/',
+                         mask_dir=f'{val_folder}/brt/',
+                         normalization=get_image_net_normalization())
+
+    # Dataloaders
     train_batches = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4, prefetch_factor=2, pin_memory=True)
-    validation_batches = DataLoader(val_set, batch_size=batch_size, shuffle=True , num_workers=4, prefetch_factor=2, pin_memory=True)
-    test_batches = DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=4, prefetch_factor=2, pin_memory=True)
+    val_batches = DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=4, prefetch_factor=2, pin_memory=True)
 
     # Setup model
     model = RGBUNet()
@@ -106,7 +60,7 @@ if __name__ == '__main__':
         for epoch in range(num_epochs):
             tqdm.write(f"\nEpoch {epoch + 1}/{num_epochs}")
             train_loss = train_one_epoch(model, train_batches, criterion, optimizer, device)
-            val_loss, val_dice = validate_one_epoch(model, test_batches, criterion, device, num_classes=14)
+            val_loss, val_dice = validate_one_epoch(model, val_batches, criterion, device, num_classes=14)
             history['train_loss'].append(train_loss)
             history['val_loss'].append(val_loss)
             history['val_dice'].append(val_dice)
