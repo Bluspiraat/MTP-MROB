@@ -20,11 +20,10 @@ class EarlyFusionUNet(nn.Module):
             classes=n_classes
         )
 
-    def forward(self, rgb, dsm):  # This method is never called directly, it is handeled by the nn.Module by calling
+    def forward(self, rgb_dsm):  # This method is never called directly, it is handeled by the nn.Module by calling
         # EarlyFusionUNet.__call__() which handles hooks, train and evaluation modes and calls forward internally
         # Early fusion: concatenate DSM to RGB along the channel dimension
-        x = torch.cat([rgb, dsm], dim=1)
-        logits = self.model(x)
+        logits = self.model(rgb_dsm)
         return logits
 
 
