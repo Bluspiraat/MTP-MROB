@@ -96,19 +96,15 @@ def classes_combined(files, output_file):
 
 if __name__ == '__main__':
 
-    files = []
-
+    folder = 'train'
     class_map_file = "C:/MTP-Data/dataset_diverse_2022_512/class_map.json"
-    areas = ['schoorl', 'bies_bosch', 'soesterberg', 'vierhouten']
+    pixel_count_file = f"C:/MTP-Data/dataset_diverse_2022_512_sep/{folder}/pixel_count.json"
+    brt_folder = f"C:/MTP-Data/dataset_diverse_2022_512_sep/{folder}/brt/"
+    title = f"Class distribution of folder {folder}"
 
-    for area in areas:
-        brt_folder = f'C:/MTP-Data/dataset_diverse_2022_512/{area}/brt/'
-        pixel_count_file = f'C:/MTP-Data/dataset_diverse_2022_512/{area}/pixel_count.json'
-        title = f'Class distribution of {area}'
+    make_pixel_count(brt_folder, class_map_file, pixel_count_file)
+    calculate_fractions(pixel_count_file, class_map_file, title)
 
-        make_pixel_count(brt_folder, class_map_file, pixel_count_file)
-        calculate_fractions(pixel_count_file, class_map_file, title)
-
-    output_file = 'C:/MTP-Data/dataset_diverse_2022_512/total_pixel_count.json'
-    calculate_fractions(output_file, class_map_file, f'Class distribution entire dataset')
-    classes_combined(files, output_file)
+    # output_file = 'C:/MTP-Data/dataset_diverse_2022_512/total_pixel_count.json'
+    # calculate_fractions(output_file, class_map_file, f'Class distribution entire dataset')
+    # classes_combined(files, output_file)

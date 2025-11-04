@@ -2,6 +2,7 @@ import os
 import shutil
 from tqdm import tqdm
 import random
+import numpy as np
 
 def get_split_indices(splits, length):
     indices = [i for i in range(length)]
@@ -43,10 +44,20 @@ def group_data(global_directory):
                 shutil.copy(input_file, output_file)
     return len(os.listdir(os.path.join(global_directory, modalities[0])))
 
-if __name__ == "__main__":
-    global_directory = "C:/MTP-Data/dataset_diverse_2022_512"
-    # data_size = group_data(global_directory)
-    split(global_directory, [0.8, 0.1, 0.1], 70756)
+def check_files_coherence(global_directory):
+    types = ['train', 'val', 'test']
+    for type in types:
+        brt = np.array(os.listdir(os.path.join(global_directory, type, 'brt/')))
+        dsm = np.array(os.listdir(os.path.join(global_directory, type, 'dsm/')))
+        ortho = np.array(os.listdir(os.path.join(global_directory, type, 'ortho/')))
+        assert len(brt) == len(dsm) == len(ortho)
+        assert len(set(brt)) == len(set(dsm)) == len(set(ortho))
+        assert np.array_equal(brt, dsm) and np.array_equal(brt, ortho) and np.array_equal(dsm, ortho)
 
+if __name__ == "__main__":
+    global_directory = "C:/MTP-Data/dataset_diverse_2022_512_sep"
+    # data_size = group_data(global_directory)
+    # split(global_directory, [0.8, 0.1, 0.1], 70756)
+    check_files_coherence(global_directory)
 
 
