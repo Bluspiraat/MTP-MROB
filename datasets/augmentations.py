@@ -1,6 +1,7 @@
 import albumentations as A
 import cv2
 from albumentations.pytorch import ToTensorV2
+import numpy as np
 
 
 def get_geometric_transform():
@@ -8,16 +9,16 @@ def get_geometric_transform():
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
-        A.Affine(translate_percent=(-0.05, 0.05),
-                 scale=(0.9, 1.1),
-                 rotate=(-10, 10),
-                 p=0.5,
-                 border_mode=cv2.BORDER_CONSTANT,
-                 fill=-1)
+        A.Affine(
+            translate_percent=(-0.05, 0.05),
+            scale=(0.9, 1.1),
+            rotate=(-10, 10),
+            p=0.5,
+            border_mode=cv2.BORDER_CONSTANT,
+            fill=-1  # template fill value for all inputs
+        )
     ],
-        additional_targets={'dsm': 'image'}
-    )
-
+    additional_targets={'dsm': 'image'})
 
 def get_rgb_transform():
     return A.Compose([

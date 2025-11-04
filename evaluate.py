@@ -7,25 +7,30 @@ from datasets.augmentations import get_image_net_normalization, get_rgb_transfor
 import numpy as np
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
-from models import RGBUNet
-from datasets import RGBDataset
+from models import RGBUNet, EarlyFusionUNet
+from datasets import RGBDataset, RGBDSMDataset
 from tqdm import tqdm
+import os
 
 
 def plot_loss(loss_location, title):
     with open(loss_location, 'r') as f:
         data = json.load(f)
+
+    epochs = range(1, len(data['train_loss']) + 1)
+
     plt.plot(data['train_loss'])
     plt.plot(data['val_loss'])
     plt.plot(data['val_dice'])
     plt.legend(['train_loss', 'val_loss', 'val_dice'])
     plt.ylabel('Loss')
     plt.xlabel('Epoch')
+    plt.xticks(range(0, len(epochs) + 1, 5))
     plt.title(title)
     plt.show()
 
 
-def show_predictions(model, dataloader, device, num_examples=4, class_colors=None):
+def show_predictions(model, dataloader, device, output_dir, title="", num_examples=4, class_colors=None):
     """
     Visualize input, ground truth, and predicted segmentation masks.
 
@@ -38,6 +43,8 @@ def show_predictions(model, dataloader, device, num_examples=4, class_colors=Non
     """
     model.eval()
     shown = 0
+
+    os.makedirs(output_dir, exist_ok=True)
 
     if class_colors is not None:
         class_colors = np.array([mcolors.to_rgb(c) for c in class_colors])
@@ -58,8 +65,11 @@ def show_predictions(model, dataloader, device, num_examples=4, class_colors=Non
             for i in range(images.shape[0]):
                 if shown >= num_examples:
                     return  # stop when enough examples are shown
-
-                img = images[i].permute(1, 2, 0).numpy()
+                if images[i].shape[0] == 4:
+                    rgb, _ = torch.split(images[i], [3, 1], dim=0)
+                else:
+                    rgb = images[i]
+                img = rgb.permute(1, 2, 0).numpy()
                 gt = labels[i].numpy()
                 pr = preds[i].numpy()
 
@@ -86,8 +96,11 @@ def show_predictions(model, dataloader, device, num_examples=4, class_colors=Non
                 for ax in axes:
                     ax.axis("off")
 
-                plt.tight_layout()
-                plt.show()
+                adjusted_title = f'{title}, example nr. {shown + 1}'
+                fig.suptitle(adjusted_title, fontsize=16)
+                output_path = os.path.join(output_dir, f"example_{shown + 1}.png")
+                plt.savefig(output_path, dpi=300, bbox_inches='tight')
+                plt.close()  # Close the figure to free memory
                 shown += 1
 
 
@@ -139,33 +152,15 @@ def evaluate_per_class_accuracy(model, dataloader, device, class_names):
     return per_class_acc, mean_acc, cm
 
 
-def create_datasets_splits(folders, splits, seed):
-    datasets = []
-    for folder in folders:
-        datasets.append(RGBDataset(rgb_dir=f'{folder}/ortho/',
-                             mask_dir=f'{folder}/brt/',
-                             normalization=get_image_net_normalization()))
-    train_sets = []
-    validation_sets = []
-    test_sets = []
-    for dataset in datasets:
-        train_set_temp, validation_set_temp, test_set_temp = random_split(dataset, splits,
-                                                                          generator=torch.Generator().manual_seed(seed))
-        train_sets.append(train_set_temp)
-        validation_sets.append(validation_set_temp)
-        test_sets.append(test_set_temp)
-    return ConcatDataset(train_sets), ConcatDataset(validation_sets), ConcatDataset(test_sets)
-
-
-
 if __name__ == '__main__':
-    model_weights = "C:/MTP-Code/trained_models/rgb_unet_varied_full.pth"
-    loss_location = "C:/MTP-Code/trained_models/rgb_unet_varied_full.json"
-    data_folders = ["C:/MTP-Data/dataset_diverse_2022_512/bies_bosch",
-                    "C:/MTP-Data/dataset_diverse_2022_512/schoorl",
-                    "C:/MTP-Data/dataset_diverse_2022_512/vierhouten",
-                    "C:/MTP-Data/dataset_diverse_2022_512/soesterberg"]
-    title = "full dataset, batch size 8"
+    model_weights = "C:/MTP-Data/trained_models/rgbdsm_u_net_pr34_b32_m/rgbdsm_u_net_pr34_b32_m.pth"
+    loss_location = "C:/MTP-Data/trained_models/rgbdsm_u_net_pr34_b32_m/rgbdsm_u_net_pr34_b32_m.json"
+    image_folder = "C:/MTP-Data/trained_models/rgbdsm_u_net_pr34_b32_m/images"
+    title = "RGBDSM: Pre-trained ResNet-34, batch size 32"
+
+    rgb_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/ortho"
+    dsm_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/dsm"
+    mask_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/brt"
     class_map = "C:/MTP-Code/Data/BRT/class_map.json"
     color_map = "C:/MTP-Code/Data/BRT/class_to_color.json"
     plot_examples = 20
@@ -179,17 +174,24 @@ if __name__ == '__main__':
         colors = [v for k, v in class_map.items()]
 
     # Setup model
-    model = RGBUNet()
-    model.load_state_dict(torch.load(model_weights))
+    model = EarlyFusionUNet()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.load_state_dict(torch.load(model_weights, weights_only=True, map_location=device))
     model.to(device)
 
     # Setup dataloader
-    train_set, val_set, test_set = create_datasets_splits(folders=data_folders, splits=[0.8, 0.1, 0.1], seed=43)
+    test_set = RGBDSMDataset(rgb_dir=rgb_folder,
+                             mask_dir=mask_folder,
+                             dsm_dir=dsm_folder,
+                             normalization=get_image_net_normalization())
 
     # Subset train and test set
-    test_batches = DataLoader(test_set, batch_size=4, shuffle=True, num_workers=4)
+    test_batches = DataLoader(test_set, batch_size=2, shuffle=True, num_workers=4)
 
-    plot_loss(loss_location, title)
-    per_class_acc, mean_acc, cm = evaluate_per_class_accuracy(model, test_batches, device, classes)
-    show_predictions(model, test_batches, device, num_examples=plot_examples, class_colors=colors)
+    # plot_loss(loss_location, title)
+    # per_class_acc, mean_acc, cm = evaluate_per_class_accuracy(model, test_batches, device, classes)
+    show_predictions(model, test_batches, device,
+                     num_examples=plot_examples,
+                     class_colors=colors,
+                     output_dir=image_folder,
+                     title=title)

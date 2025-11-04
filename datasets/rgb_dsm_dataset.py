@@ -21,8 +21,13 @@ class RGBDSMDataset(Dataset):
 
     def _convert_rgb(self, file_location):
         with rasterio.open(file_location) as src:
-            rgb = src.read()
-            return rgb / 255.0
+            rgb = src.read().astype(np.float32)/255.0
+            return rgb
+
+    def _convert_mask(self, file_location):
+        with rasterio.open(file_location) as src:
+            mask = src.read(1).astype(np.int64)
+            return mask
 
     def _convert_dsm(self, file_location):
         with rasterio.open(file_location) as src:
@@ -31,11 +36,6 @@ class RGBDSMDataset(Dataset):
             dsm.clip(self.vmin, self.vmax)
             dsm = (dsm-self.vmin)/(self.vmax-self.vmin)
             return dsm
-
-    def _convert_mask(self, file_location):
-        with rasterio.open(file_location) as src:
-            mask = src.read(1)
-            return mask
 
     def __getitem__(self, idx):
         id_ = self.ids[idx]
@@ -50,6 +50,9 @@ class RGBDSMDataset(Dataset):
         if self.geo_transform:
             augmented = self.geo_transform(image=rgb, dsm=dsm, mask=mask)
             rgb, dsm, mask = augmented["image"], augmented["dsm"], augmented["mask"]
+            rgb[rgb == -1] = 0
+            dsm[dsm == -1] = 9
+            mask[mask == -1] = 0
 
         rgb = np.clip(rgb, 0.0, 1.0)
 
@@ -62,7 +65,6 @@ class RGBDSMDataset(Dataset):
             rgb = self.normalization(image=rgb)["image"]
 
         # Convert to torch tensors
-        rgb = np.clip(rgb, 0.0, 1.0)
         rgb = torch.tensor(rgb, dtype=torch.float32).permute(2, 0, 1)  # [3, H, W]
         dsm = torch.tensor(dsm, dtype=torch.float32)  # [H, W]
         mask = torch.tensor(mask, dtype=torch.long)  # [H, W]
@@ -103,6 +105,8 @@ class RGBDataset(Dataset):
         if self.geo_transform:
             augmented = self.geo_transform(image=rgb, mask=mask)
             rgb, mask = augmented["image"], augmented["mask"]
+            rgb[rgb == -1] = 0
+            mask[mask == -1] = 0
 
         rgb = np.clip(rgb, 0.0, 1.0)
 
