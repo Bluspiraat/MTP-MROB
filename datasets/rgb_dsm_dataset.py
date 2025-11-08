@@ -12,7 +12,7 @@ class RGBDSMDataset(Dataset):
         self.geo_transform = geo_transform
         self.rgb_transform = rgb_transform
         self.normalization = normalization
-        self.vmin = -5
+        self.vmin = -10
         self.vmax = 100
         self.ids = [f.split('.')[0] for f in os.listdir(rgb_dir) if f.endswith('.tif')]
 
@@ -32,7 +32,7 @@ class RGBDSMDataset(Dataset):
     def _convert_dsm(self, file_location):
         with rasterio.open(file_location) as src:
             dsm = src.read(1)
-            np.nan_to_num(dsm, copy=False, nan=self.vmin)
+            np.nan_to_num(dsm, copy=False, nan=0)
             dsm.clip(self.vmin, self.vmax)
             dsm = (dsm-self.vmin)/(self.vmax-self.vmin)
             return dsm
@@ -51,10 +51,11 @@ class RGBDSMDataset(Dataset):
             augmented = self.geo_transform(image=rgb, dsm=dsm, mask=mask)
             rgb, dsm, mask = augmented["image"], augmented["dsm"], augmented["mask"]
             rgb[rgb == -1] = 0
-            dsm[dsm == -1] = 9
+            dsm[dsm == -1] = 0
             mask[mask == -1] = 0
 
         rgb = np.clip(rgb, 0.0, 1.0)
+        dsm = np.clip(dsm, 0.0, 1.0)
 
         # Color distortions
         if self.rgb_transform:
