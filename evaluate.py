@@ -13,21 +13,27 @@ from tqdm import tqdm
 import os
 
 
-def plot_loss(loss_location, title):
+def plot_loss(loss_location, title, output_path):
     with open(loss_location, 'r') as f:
         data = json.load(f)
 
+    best_epoch = data['val_loss'].index(min(data['val_loss']))
+    best_epoch_val = data['val_loss'][best_epoch]
+
     epochs = range(1, len(data['train_loss']) + 1)
 
-    plt.plot(data['train_loss'])
-    plt.plot(data['val_loss'])
-    plt.plot(data['val_dice'])
+    plt.plot(range(1, len(epochs)+1), data['train_loss'])
+    plt.plot(range(1, len(epochs)+1), data['val_loss'])
+    plt.plot(range(1, len(epochs)+1), data['val_dice'])
     plt.legend(['train_loss', 'val_loss', 'val_dice'])
     plt.ylabel('Loss')
     plt.xlabel('Epoch')
-    plt.xticks(range(0, len(epochs) + 1, 5))
-    plt.title(title)
+    plt.xticks(range(1, len(epochs)+1, 5))
+    plt.title(title + f'\n Lowest validation loss is {best_epoch_val:.4f} at epoch: {best_epoch+1}')
+    plt.tight_layout()
+    plt.savefig(f'{output_path}/loss_plot.png', dpi=300, bbox_inches='tight')
     plt.show()
+    plt.close()  # Close the figure to free memory
 
 
 def show_predictions(model, dataloader, device, output_dir, title="", num_examples=4, class_colors=None):
@@ -44,7 +50,7 @@ def show_predictions(model, dataloader, device, output_dir, title="", num_exampl
     model.eval()
     shown = 0
 
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'examples'), exist_ok=True)
 
     if class_colors is not None:
         class_colors = np.array([mcolors.to_rgb(c) for c in class_colors])
@@ -96,15 +102,15 @@ def show_predictions(model, dataloader, device, output_dir, title="", num_exampl
                 for ax in axes:
                     ax.axis("off")
 
-                adjusted_title = f'{title}, example nr. {shown + 1}'
+                adjusted_title = f'{title}, example nr. {shown + 1:02d}'
                 fig.suptitle(adjusted_title, fontsize=16)
-                output_path = os.path.join(output_dir, f"example_{shown + 1}.png")
+                output_path = os.path.join(output_dir, f"examples/example_{shown + 1}.png")
                 plt.savefig(output_path, dpi=300, bbox_inches='tight')
                 plt.close()  # Close the figure to free memory
                 shown += 1
 
 
-def plot_confusion_matrix(cm, class_names):
+def plot_confusion_matrix(cm, class_names, output_path):
     cm_normalized = cm.astype('float') / cm.sum(axis=1, keepdims=True)
     cm_normalized = np.nan_to_num(cm_normalized)  # replaces NaNs and infs with 0
 
@@ -114,10 +120,13 @@ def plot_confusion_matrix(cm, class_names):
     plt.xlabel("Predicted Class")
     plt.ylabel("True Class")
     plt.title("Normalized Confusion Matrix (per true class)")
+    plt.tight_layout()
+    plt.savefig(f'{output_path}/confusion_matrix.png', dpi=300, bbox_inches='tight')
     plt.show()
+    plt.close()  # Close the figure to free memory
 
 
-def evaluate_per_class_accuracy(model, dataloader, device, class_names):
+def evaluate_per_class_accuracy(model, dataloader, device, class_names, output_path):
     model.eval()
     num_classes = len(class_names)
     cm = np.zeros((num_classes, num_classes), dtype=np.int64)
@@ -148,15 +157,61 @@ def evaluate_per_class_accuracy(model, dataloader, device, class_names):
         per_class_acc = np.nan_to_num(per_class_acc)
     mean_acc = np.mean(per_class_acc)
 
-    plot_confusion_matrix(cm, class_names)
+    plot_confusion_matrix(cm, class_names, output_path)
     return per_class_acc, mean_acc, cm
+
+def segmentation_metrics_from_cm(cm, class_names=None, output_dir=None):
+    cm = cm.astype(np.float64)
+
+    TP = np.diag(cm)
+    FP = np.sum(cm, axis=0) - TP
+    FN = np.sum(cm, axis=1) - TP
+    total = np.sum(cm)
+
+    IoU = TP / (TP + FP + FN + 1e-12)
+    mIoU = np.nanmean(IoU)
+
+    freq = np.sum(cm, axis=1) / total
+    FWIoU = np.sum(freq * IoU)
+
+    Dice = 2 * TP / (2 * TP + FP + FN + 1e-12)
+    mean_Dice = np.nanmean(Dice)
+
+    PA = np.sum(TP) / total
+    class_PA = TP / np.sum(cm, axis=1)
+    mPA = np.nanmean(class_PA)
+
+    # Build results dictionary
+    results = {
+        "Pixel_Accuracy": float(PA),
+        "Mean_Pixel_Accuracy": float(mPA),
+        "Mean_IoU": float(mIoU),
+        "Frequency_Weighted_IoU": float(FWIoU),
+        "Mean_Dice": float(mean_Dice),
+        "Per_Class": {}
+    }
+
+    # Add per-class metrics
+    for i in range(len(class_names)):
+        name = class_names[i]
+        results["Per_Class"][name] = {
+            "IoU": float(IoU[i]),
+            "Dice": float(Dice[i]),
+            "Pixel_Accuracy": float(class_PA[i])
+        }
+
+    # Optionally save to JSON
+    output_path = os.path.join(output_dir, "metrics.json")
+    with open(output_path, "w") as f:
+        json.dump(results, f, indent=4)
+    print(f"✅ Metrics saved to {output_path}")
 
 
 if __name__ == '__main__':
-    model_weights = "C:/MTP-Data/trained_models/rgbdsm_u_net_pr34_b32_m/rgbdsm_u_net_pr34_b32_m.pth"
-    loss_location = "C:/MTP-Data/trained_models/rgbdsm_u_net_pr34_b32_m/rgbdsm_u_net_pr34_b32_m.json"
-    image_folder = "C:/MTP-Data/trained_models/rgbdsm_u_net_pr34_b32_m/images"
-    title = "RGBDSM: Pre-trained ResNet-34, batch size 32"
+    model_weights = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a03/rgbdsm_u_net_r34_b16_a03.pth"
+    loss_location = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a03/loss_values.json"
+    folder = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a03/"
+    title = "RGBDSM: Pre-trained ResNet-34, batch size 16, alpha 0.3"
 
     rgb_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/ortho"
     dsm_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/dsm"
@@ -173,7 +228,8 @@ if __name__ == '__main__':
         class_map = json.load(f)
         colors = [v for k, v in class_map.items()]
 
-    # Setup model
+    # Setup
+    # model = RGBUNet(encoder_name='resnet34')
     model = EarlyFusionUNet()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(torch.load(model_weights, weights_only=True, map_location=device))
@@ -184,14 +240,17 @@ if __name__ == '__main__':
                              mask_dir=mask_folder,
                              dsm_dir=dsm_folder,
                              normalization=get_image_net_normalization())
+    # test_set = RGBDataset(rgb_dir=rgb_folder,
+    #                       mask_dir=mask_folder,
+    #                       normalization=get_image_net_normalization())
 
-    # Subset train and test set
-    test_batches = DataLoader(test_set, batch_size=2, shuffle=True, num_workers=4)
+    test_batches = DataLoader(test_set, batch_size=4, shuffle=True, num_workers=4)
 
-    # plot_loss(loss_location, title)
-    # per_class_acc, mean_acc, cm = evaluate_per_class_accuracy(model, test_batches, device, classes)
+    plot_loss(loss_location, title, folder)
+    per_class_acc, mean_acc, cm = evaluate_per_class_accuracy(model, test_batches, device, classes, folder)
+    segmentation_metrics_from_cm(cm, output_dir=folder, class_names=classes)
     show_predictions(model, test_batches, device,
                      num_examples=plot_examples,
                      class_colors=colors,
-                     output_dir=image_folder,
+                     output_dir=folder,
                      title=title)
