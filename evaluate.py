@@ -208,10 +208,10 @@ def segmentation_metrics_from_cm(cm, class_names=None, output_dir=None):
 
 
 if __name__ == '__main__':
-    model_weights = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a03/rgbdsm_u_net_r34_b16_a03.pth"
-    loss_location = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a03/loss_values.json"
-    folder = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a03/"
-    title = "RGBDSM: Pre-trained ResNet-34, batch size 16, alpha 0.3"
+    model_weights = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a07/rgbdsm_u_net_r34_b16_a07.pth"
+    loss_location = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a07/loss_values.json"
+    folder = "C:/MTP-Data/trained_models/rgbdsm_u_net_r34_b16_a07/"
+    title = "RGBDSM: ResNet-34, batch size 16, alpha 0.7"
 
     rgb_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/ortho"
     dsm_folder = "C:/MTP-Data/dataset_diverse_2022_512_sep/test/dsm"

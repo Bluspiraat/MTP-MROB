@@ -47,7 +47,7 @@ class RGBUNet(nn.Module):
         return logits
 
 
-class PretrainedMidFusionUNet(nn.Module):
+class MidFusionUNet(nn.Module):
     """Dual-encoder U-Net for RGB + DSM fusion (mid-level fusion).
     Works with variable input sizes (multiples of 32)."""
 
@@ -56,7 +56,7 @@ class PretrainedMidFusionUNet(nn.Module):
 
         # Encoders
         self.encoder_rgb = smp.encoders.get_encoder(
-            rgb_encoder, in_channels=3, depth=5, weights='imagenet'
+            rgb_encoder, in_channels=3, depth=5, weights=None
         )
         self.encoder_dsm = smp.encoders.get_encoder(
             dsm_encoder, in_channels=1, depth=5, weights=None
@@ -69,21 +69,21 @@ class PretrainedMidFusionUNet(nn.Module):
         self.decoder = smp.decoders.unet.decoder.UnetDecoder(
             encoder_channels=fused_channels,
             decoder_channels=(256, 128, 64, 32, 16),
-            n_blocks=5,
-            use_batchnorm=True,
-            center=True,
+            n_blocks=5
         )
 
         # Output head
         self.segmentation_head = nn.Conv2d(16, n_classes, kernel_size=1)
 
-    def forward(self, rgb, dsm):
+    def forward(self, rgb_dsm):
+        rgb = rgb_dsm[:, :3, :, :]  # shape: (B, 3, H, W)
+        dsm = rgb_dsm[:, 3:, :, :]  # shape: (B, 1, H, W)
         feats_rgb = self.encoder_rgb(rgb)
         feats_dsm = self.encoder_dsm(dsm)
 
         fused_feats = [torch.cat([f_r, f_d], dim=1)
                        for f_r, f_d in zip(feats_rgb, feats_dsm)]
 
-        x = self.decoder(*fused_feats)
+        x = self.decoder(fused_feats)
         logits = self.segmentation_head(x)
         return logits
