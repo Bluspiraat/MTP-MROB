@@ -1,3 +1,3 @@
 from .unets import *
 
-__all__ = ["EarlyFusionUNet", "RGBUNet", "MidFusionUNet"]
+__all__ = ["EarlyFusionUNet", "RGBUNet", "MidFusionUNet", "SegFormer"]

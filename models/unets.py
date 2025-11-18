@@ -87,3 +87,21 @@ class MidFusionUNet(nn.Module):
         x = self.decoder(fused_feats)
         logits = self.segmentation_head(x)
         return logits
+
+
+class SegFormer(nn.Module):
+    def __init__(self, n_classes=14, encoder_name='mit_b2', pretrained=True):
+        super().__init__()
+
+        weights = 'imagenet' if pretrained else None
+        self.model = smp.Segformer(
+            encoder_name=encoder_name,
+            encoder_weights=weights,
+            in_channels=3,  # 3 RGB
+            classes=n_classes
+        )
+
+    def forward(self, rgb):
+        logits = self.model(rgb)
+        return logits
+
