@@ -56,7 +56,6 @@ if __name__ == '__main__':
     data_folder = "C:/MTP-Data/trained_models/"
     models = get_models(data_folder)
 
-    '''
     # --- Page setup --- #
     st.set_page_config(layout="wide")
 
@@ -115,4 +114,3 @@ if __name__ == '__main__':
         data_per_class[model_name] = model.metrics["Per_Class"][class_metric]
     data_per_class.replace(0, np.nan, inplace=True)
     st.dataframe(data_per_class.style.highlight_max(axis=1, color='green'), height=550)
-    '''
