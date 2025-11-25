@@ -83,7 +83,34 @@ class Grid:
         plt.imshow(color_coded)
         plt.show()
 
-    # def get_neighbours(self, tile: Tuple[int, int]) -> List[Tuple[int, int]]:
+    def reduce_grid(self, new_origin: Tuple[int, int], size: Tuple[int, int]):
+        """
+        Reduces the grid to a new grid size, thus creating a subset
+
+        Args:
+            new_origin (Tuple[int, int]): The starting row and column of the subset
+            size: The size of the grid given in row and columns numbers
+        """
+        self.cost = self.cost[new_origin[0]:new_origin[0]+size[0], new_origin[1]:new_origin[1]+size[1]]
+        self.category = self.category[new_origin[0]:new_origin[0]+size[0], new_origin[1]:new_origin[1]+size[1]]
+
+    def get_neighbours(self, location: Tuple[int, int]) -> Tuple[Tuple[int, int], ...]:
+        """
+        Check the neighbours in all four perpendicular directions and returns if they are accessible.
+
+        Args:
+            location Tuple[int, int]: The row and column of the cell of which the neighbours are te be returned.
+
+        Returns:
+            neighbours Tuple[Tuple[int, int], ...]: The neighbours of the cell at the given location.
+        """
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        neighbours = []
+        for row_dir, col_dir in directions:
+            row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
+            if row_nb >= 0 and col_nb >= 0 and self.category[row_nb][col_nb] is not 0:
+                neighbours.append((row_nb, col_nb))
+        return tuple(neighbours)
 
 
 @dataclass
@@ -113,6 +140,24 @@ class OccupancyGrid:
         lookup = np.zeros(14, dtype=bool)
         lookup[self.blocked_categories] = True
         self.occupancy_grid = lookup[self.base_grid.category]
+
+    def get_neighbours(self, location: Tuple[int, int]) -> Tuple[Tuple[int, int], ...]:
+        """
+        Check the neighbours in all four perpendicular directions and returns if they are accessible.
+
+        Args:
+            location Tuple[int, int]: The row and column of the cell of which the neighbours are te be returned.
+
+        Returns:
+            neighbours Tuple[Tuple[int, int], ...]: The neighbours of the cell at the given location.
+        """
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        neighbours = []
+        for row_dir, col_dir in directions:
+            row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
+            if row_nb >= 0 and col_nb >= 0 and not self.occupancy_grid[row_nb][col_nb]:
+                neighbours.append((row_nb, col_nb))
+        return tuple(neighbours)
 
     def display_grid(self):
         blocked_categories = [self.base_grid.categories[index] for index in self.blocked_categories]
