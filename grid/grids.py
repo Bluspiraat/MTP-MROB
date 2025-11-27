@@ -23,6 +23,7 @@ class Grid:
     """
     grid_file: str
     cost_mapping: List[int]
+    shape: Tuple[int, int] = field(init=False)
 
     # --- Standard values --- #
     categories = ["unknown", "hardened", "half-hardened", "unhardened", "track", "fallow", "agriculture",
@@ -37,6 +38,7 @@ class Grid:
     def __post_init__(self):
         assert len(self.cost_mapping) == 14
         self.category, self.cost = self._load_grid(self.cost_mapping)
+        self.shape = self.category.shape
         print(f'Grid loaded with tiles: {len(self.category)}')
 
     def _load_grid(self, cost_mapping: List) -> Tuple[NDArray, NDArray]:
@@ -108,7 +110,7 @@ class Grid:
         neighbours = []
         for row_dir, col_dir in directions:
             row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
-            if row_nb >= 0 and col_nb >= 0 and self.category[row_nb][col_nb] is not 0:
+            if self.shape[0]-1 >= row_nb >= 0 and self.shape[1]-1 >= col_nb >= 0 and self.category[row_nb][col_nb] is not 0:
                 neighbours.append((row_nb, col_nb))
         return tuple(neighbours)
 
@@ -129,6 +131,8 @@ class OccupancyGrid:
     blocked_categories: List[int]
 
     occupancy_grid: NDArray[np.bool_] = field(init=False)
+    cost: NDArray = field(init=False)
+    shape: Tuple[int, int] = field(init=False)
 
     def __post_init__(self):
         """
@@ -140,6 +144,8 @@ class OccupancyGrid:
         lookup = np.zeros(14, dtype=bool)
         lookup[self.blocked_categories] = True
         self.occupancy_grid = lookup[self.base_grid.category]
+        self.cost: NDArray[np.int8] = np.ones_like(self.occupancy_grid)
+        self.shape = self.cost.shape
 
     def get_neighbours(self, location: Tuple[int, int]) -> Tuple[Tuple[int, int], ...]:
         """
@@ -155,7 +161,7 @@ class OccupancyGrid:
         neighbours = []
         for row_dir, col_dir in directions:
             row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
-            if row_nb >= 0 and col_nb >= 0 and not self.occupancy_grid[row_nb][col_nb]:
+            if self.shape[0]-1 >= row_nb >= 0 and self.shape[1]-1 >= col_nb >= 0 and not self.occupancy_grid[row_nb][col_nb]:
                 neighbours.append((row_nb, col_nb))
         return tuple(neighbours)
 
