@@ -290,13 +290,14 @@ class AStar:
         """
         color_coded = self.grid.get_colored_grid()
 
+        plt.figure(figsize=(8, 8))
+        plt.imshow(color_coded)
+
         # Draw the path in red
         if self.path:
             path_rows, path_cols = zip(*self.path)
-            color_coded[path_rows, path_rows] = [1.0, 0.0, 0.0]
+            plt.scatter(path_cols, path_rows, s=3, c="red")
 
-        plt.figure(figsize=(6, 6))
-        plt.imshow(color_coded)
         plt.title(f'Path length: {len(self.path)}')
         plt.show()
 

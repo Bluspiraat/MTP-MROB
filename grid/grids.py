@@ -6,6 +6,8 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import os
 from dataclasses import dataclass, field
+import copy
+from tqdm import tqdm
 
 
 @dataclass
@@ -34,6 +36,7 @@ class Grid:
     # --- Main maps --- #
     category: NDArray = field(init=False)
     cost: NDArray = field(init=False)
+    resolution: float = field(init=False)
 
     def __post_init__(self):
         assert len(self.cost_mapping) == 14
@@ -71,6 +74,7 @@ class Grid:
             np.ndarray: The grid data in 'uint8' format.
         """
         with rasterio.open(self.grid_file) as src:
+            self.resolution = src.res[0]
             return src.read(1).astype('uint8')
 
     def display_grid(self):
@@ -79,7 +83,8 @@ class Grid:
 
         """
         file_name = os.path.basename(self.grid_file)
-        plt.title(f'Index of segmented tile: {os.path.splitext(file_name)[0]}')
+        plt.title(f'Index of segmented tile: {os.path.splitext(file_name)[0]}\n'
+                  f'Resolution of grid: {self.resolution}')
         plt.imshow(self.get_colored_grid())
         plt.show()
         return plt
@@ -103,8 +108,8 @@ class Grid:
             new_origin (Tuple[int, int]): The starting row and column of the subset
             size: The size of the grid given in row and columns numbers
         """
-        self.cost = self.cost[new_origin[0]:new_origin[0]+size[0], new_origin[1]:new_origin[1]+size[1]]
-        self.category = self.category[new_origin[0]:new_origin[0]+size[0], new_origin[1]:new_origin[1]+size[1]]
+        self.cost = self.cost[new_origin[0]:new_origin[0] + size[0], new_origin[1]:new_origin[1] + size[1]]
+        self.category = self.category[new_origin[0]:new_origin[0] + size[0], new_origin[1]:new_origin[1] + size[1]]
         self.shape = self.category.shape
         print(f'Grid reduced to size: {self.shape}')
 
@@ -122,10 +127,30 @@ class Grid:
         neighbours = []
         for row_dir, col_dir in directions:
             row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
-            if self.shape[0]-1 >= row_nb >= 0 and self.shape[1]-1 >= col_nb >= 0:
+            if self.shape[0] - 1 >= row_nb >= 0 and self.shape[1] - 1 >= col_nb >= 0:
                 if self.category[row_nb][col_nb] != 0:
                     neighbours.append((row_nb, col_nb))
         return tuple(neighbours)
+
+    def resample(self, reduction: int):
+        assert reduction % 2 == 0
+
+        # --- Creat copy and set initial parameters --- #
+        resampled_grid = copy.deepcopy(self)
+        resampled_grid.resolution = self.resolution * reduction
+        resampled_grid.shape = (int(self.shape[0] / reduction), int(self.shape[1] / reduction))
+
+        # --- Resample the categories --- #
+        resampled_grid.category = np.zeros(shape=resampled_grid.shape, dtype='uint8')
+        resampled_grid.cost = np.empty(resampled_grid.category.shape, dtype='uint8')
+        for index, value in tqdm(np.ndenumerate(resampled_grid.category), total=resampled_grid.category.size):
+        # for index, value in np.ndenumerate(resampled_grid.category):
+            relevant_cells = self.category[index[0] * reduction:index[0] * reduction + reduction,
+                                           index[1] * reduction:index[1] * reduction + reduction]
+            category = np.argmax(np.bincount(relevant_cells.flatten())).astype(np.uint8)
+            resampled_grid.category[index] = category
+            resampled_grid.cost[index] = resampled_grid.cost_mapping[category]
+        return resampled_grid
 
 
 @dataclass
@@ -174,7 +199,8 @@ class OccupancyGrid:
         neighbours = []
         for row_dir, col_dir in directions:
             row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
-            if self.shape[0]-1 >= row_nb >= 0 and self.shape[1]-1 >= col_nb >= 0 and not self.occupancy_grid[row_nb][col_nb]:
+            if self.shape[0] - 1 >= row_nb >= 0 and self.shape[1] - 1 >= col_nb >= 0 and not \
+            self.occupancy_grid[row_nb][col_nb]:
                 neighbours.append((row_nb, col_nb))
         return tuple(neighbours)
 
