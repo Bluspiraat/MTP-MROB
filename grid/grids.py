@@ -39,7 +39,7 @@ class Grid:
         assert len(self.cost_mapping) == 14
         self.category, self.cost = self._load_grid(self.cost_mapping)
         self.shape = self.category.shape
-        print(f'Grid loaded with tiles: {len(self.category)}')
+        print(f'Grid loaded with dimension: {self.shape}')
 
     def _load_grid(self, cost_mapping: List) -> Tuple[NDArray, NDArray]:
         """
@@ -78,12 +78,22 @@ class Grid:
         Displays the grid in a matplotlib figure.
 
         """
-        color_codes = np.array([mcolors.to_rgb(c) for c in self.colors])
-        color_coded = color_codes[self.category]
         file_name = os.path.basename(self.grid_file)
         plt.title(f'Index of segmented tile: {os.path.splitext(file_name)[0]}')
-        plt.imshow(color_coded)
+        plt.imshow(self.get_colored_grid())
         plt.show()
+        return plt
+
+    def get_colored_grid(self):
+        """
+        Returns a colored grid based on the grid data.
+
+        Returns:
+            A matplotlib figure with grid data for visualization
+        """
+        color_codes = np.array([mcolors.to_rgb(c) for c in self.colors])
+        color_coded = color_codes[self.category]
+        return color_coded
 
     def reduce_grid(self, new_origin: Tuple[int, int], size: Tuple[int, int]):
         """
@@ -95,6 +105,8 @@ class Grid:
         """
         self.cost = self.cost[new_origin[0]:new_origin[0]+size[0], new_origin[1]:new_origin[1]+size[1]]
         self.category = self.category[new_origin[0]:new_origin[0]+size[0], new_origin[1]:new_origin[1]+size[1]]
+        self.shape = self.category.shape
+        print(f'Grid reduced to size: {self.shape}')
 
     def get_neighbours(self, location: Tuple[int, int]) -> Tuple[Tuple[int, int], ...]:
         """
@@ -110,8 +122,9 @@ class Grid:
         neighbours = []
         for row_dir, col_dir in directions:
             row_nb, col_nb = location[0] + row_dir, location[1] + col_dir
-            if self.shape[0]-1 >= row_nb >= 0 and self.shape[1]-1 >= col_nb >= 0 and self.category[row_nb][col_nb] is not 0:
-                neighbours.append((row_nb, col_nb))
+            if self.shape[0]-1 >= row_nb >= 0 and self.shape[1]-1 >= col_nb >= 0:
+                if self.category[row_nb][col_nb] != 0:
+                    neighbours.append((row_nb, col_nb))
         return tuple(neighbours)
 
 
