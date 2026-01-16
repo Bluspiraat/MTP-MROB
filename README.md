@@ -1,5 +1,6 @@
 # dataset-creation 
-This branch focuses on the extraction of trainings data from Publieke Dienstverlening Op de Kaart (PDOK).
+This branch focuses on the extraction of trainings data from Publieke Dienstverlening Op de Kaart (PDOK). Which
+are then used in the networking training branch.
 
 ## Datatypes
 The data downloaded, subsetted and aligned for training consists of samples from the following three sources:
