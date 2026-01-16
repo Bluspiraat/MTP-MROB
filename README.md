@@ -1,5 +1,6 @@
 # U-Net architecture
-This repository has several different files. `main.py` is the core file which runs the training algorithm.
+This repository has several different files. `main.py` is the core file which runs the training algorithm. 
+This branch is copied on servers for downloading
 
 ## Installing the repository
 The repository must first be cloned before usage.
