@@ -8,7 +8,47 @@ import os
 from dataclasses import dataclass, field
 import copy
 from tqdm import tqdm
+import pandas as pd
+import geopandas as gpd
+from shapely.geometry import Point
 
+
+def cell_to_rd(cell_list, resolution, bounds):
+    """
+    Converts cell coordinates to Rijksdriehoek coordinates, inputs are in row, column.
+    Parameters
+        cell_list: A list of cells of (row, column)
+        resolution: The resolution of the cells expressed in meters
+        bounds: The bounds of the grid expressed in meters (left, bottom, right, top)
+    Returns:
+        A list of rijksdriehoek coordinates.
+    """
+    left = bounds[0]
+    top = bounds[1]
+    rd_coordinates = []
+    for cell_index in range(len(cell_list)):
+        row, column = cell_list[cell_index]
+        x = left + column * resolution
+        y = top - row * resolution
+        rd_coordinates.append((x, y))
+    return rd_coordinates
+
+def rd_to_gps(crs_list):
+    """
+    Converts Rijksdriehoek coordinates to GPS coordinates.
+    Args:
+        crs_list: A list of tuples of (x, y) coordinates.
+    Returns:
+        a list of GPS coordinates of (latitude and longitude) formats.
+    """
+
+    x, y = zip(*crs_list)
+    gdf_rd = gpd.GeoDataFrame(
+        geometry=gpd.points_from_xy(x, y),
+        crs="EPSG:28992"
+    )
+    gdf_gps = gdf_rd.to_crs("EPSG:4326")
+    return list(zip(gdf_gps.geometry.y, gdf_gps.geometry.x))
 
 @dataclass
 class Grid:
@@ -22,10 +62,13 @@ class Grid:
                                    for each category index (0-13).
         category (NDArray): The calculated 2D array of category indices (uint8).
         cost (NDArray): The calculated 2D array of traversability costs (uint8).
+        shape (Tuple): The height and width in number of cells.
+        bounds (Tuple): The bounding box of the grid (left, bottom, right, top).
     """
     grid_file: str
     cost_mapping: List[int]
     shape: Tuple[int, int] = field(init=False)
+    bounds: Tuple[float, float, float, float] = field(init=False)
 
     # --- Standard values --- #
     categories = ["unknown", "hardened", "half-hardened", "unhardened", "track", "fallow", "agriculture",
@@ -61,9 +104,8 @@ class Grid:
                 - NDArray: The calculated cost grid.
         """
         category_grid = self._load_data()
-        cost_grid = np.empty(category_grid.shape, dtype='uint8')
-        for index, value in np.ndenumerate(category_grid):
-            cost_grid[index] = cost_mapping[value]
+        costs = np.array(cost_mapping, dtype='uint8')
+        cost_grid = costs[category_grid]
         return category_grid, cost_grid
 
     def _load_data(self) -> np.ndarray:
@@ -75,6 +117,7 @@ class Grid:
         """
         with rasterio.open(self.grid_file) as src:
             self.resolution = src.res[0]
+            self.bounds = src.bounds[:]
             return src.read(1).astype('uint8')
 
     def display_grid(self):
@@ -111,6 +154,11 @@ class Grid:
         self.cost = self.cost[new_origin[0]:new_origin[0] + size[0], new_origin[1]:new_origin[1] + size[1]]
         self.category = self.category[new_origin[0]:new_origin[0] + size[0], new_origin[1]:new_origin[1] + size[1]]
         self.shape = self.category.shape
+        left = self.bounds[0] + new_origin[0]*self.resolution
+        right = left + size[0]*self.resolution
+        bottom = self.bounds[1] + new_origin[1]*self.resolution
+        top = bottom + size[1]*self.resolution
+        self.bounds = (left, bottom, right, top)
         print(f'Grid reduced to size: {self.shape}')
 
     def get_neighbours(self, location: Tuple[int, int]) -> Tuple[Tuple[int, int], ...]:
