@@ -9,5 +9,5 @@ area_names = ['bies_bosch', 'schoorl', 'soesterberg', 'vierhouten']
 gml_file = "C:/MTP-Data/top10nl_wegdeel.gml"
 for bbox, area_name in zip(bboxes, area_names):
     gdf_new = gpd.read_file(gml_file, bbox=bbox)
-    gdf_new.set_crs("EPSG:28992")
+    gdf_new.crs = "EPSG:28992"
     gdf_new.to_file(f"top10nl_wegdeel_{area_name}.gml", driver="GML")
