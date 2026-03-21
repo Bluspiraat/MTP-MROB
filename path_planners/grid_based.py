@@ -61,8 +61,8 @@ class AStarOccupancy:
         Performs A* search on a grid given a start and goal coordinates.
 
         Args:
-            start: Is a Tuple[int, int] representing the start coordinate.
-            goal: Is a Tuple[int, int] representing the goal coordinate.
+            start: Is a Tuple[int, int] representing the start coordinate. With row, column order.
+            goal: Is a Tuple[int, int] representing the goal coordinate. With row, column order.
 
         Returns:
             A list of shortest path from the start to the goal coordinates. None if no path exists.

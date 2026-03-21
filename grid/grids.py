@@ -13,25 +13,27 @@ import geopandas as gpd
 from shapely.geometry import Point
 
 
-def cell_to_rd(cell_list, resolution, bounds):
+def cell_to_rd(cell_list, resolution, bounds, spacing):
     """
     Converts cell coordinates to Rijksdriehoek coordinates, inputs are in row, column.
     Parameters
         cell_list: A list of cells of (row, column)
         resolution: The resolution of the cells expressed in meters
         bounds: The bounds of the grid expressed in meters (left, bottom, right, top)
+        spacing: Keeps every nth cell
     Returns:
         A list of rijksdriehoek coordinates.
     """
     left = bounds[0]
-    top = bounds[1]
+    top = bounds[3]
     rd_coordinates = []
     for cell_index in range(len(cell_list)):
         row, column = cell_list[cell_index]
         x = left + column * resolution
         y = top - row * resolution
         rd_coordinates.append((x, y))
-    return rd_coordinates
+    return rd_coordinates[0::spacing]
+
 
 def rd_to_gps(crs_list):
     """
