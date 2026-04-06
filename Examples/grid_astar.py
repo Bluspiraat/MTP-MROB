@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     cost_list = [cost for category, cost in cost_dict.items()]
     grid = Grid(input_data, cost_list)
-    grid.reduce_grid((0, 0), (5000, 5000))
+    # grid.reduce_grid((0, 0), (5000, 5000))
     grid.display_grid()
 
     astar = AStar(grid)

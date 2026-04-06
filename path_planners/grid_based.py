@@ -18,7 +18,7 @@ def _heuristic(node: Tuple[int, int], goal: Tuple[int, int]) -> int:
     Returns:
         An integer value denoting the manhattan distance to the goal node
     """
-    return abs(node[0] - goal[0]) + abs(node[1] - goal[1])
+    return abs(node[0] - goal[0]) + abs(node[1] - goal[1])*2
 
 
 def _reconstruct_path(node: Tuple[int, int], came_from: Dict[Tuple[int, int], Tuple[int, int]]) -> (
@@ -130,7 +130,7 @@ class AStarOccupancy:
         print('No path found')
         return None
 
-    def display_path_on_grid(self):
+    def display_path_on_grid(self, export=False, title=None, save_path='export.jpg'):
         """
         Displays a white grid with the path in red.
         """
@@ -141,8 +141,6 @@ class AStarOccupancy:
             img[r, c] = [1, 0, 0]  # red
 
         plt.figure(figsize=(6, 6))
-        plt.title(f'Path length: {len(self.path)}')
-        plt.imshow(img)
         plt.show()
 
     def run_interactive(self):
@@ -284,13 +282,13 @@ class AStar:
         print('No path found')
         return None
 
-    def display_path_on_grid(self):
+    def display_path_on_grid(self, export=False, title=None, save_path='test.jpg'):
         """
         Displays a white grid with the path in red.
         """
         color_coded = self.grid.get_colored_grid()
 
-        plt.figure(figsize=(8, 8))
+        plt.figure(figsize=(6, 6))
         plt.imshow(color_coded)
 
         # Draw the path in red
@@ -298,7 +296,18 @@ class AStar:
             path_rows, path_cols = zip(*self.path)
             plt.scatter(path_cols, path_rows, s=3, c="red")
 
-        plt.title(f'Path length: {len(self.path)}')
+        if title is not None:
+            plt.title(title)
+        else:
+            plt.title(f'Path length: {len(self.path)}')
+
+        plt.scatter(self.start[1], self.start[0], c='green', s=100, label='Start')
+        plt.scatter(self.goal[1], self.goal[0], c='red', s=100, label='Goal')
+        plt.xlabel("Cells in east direction")
+        plt.ylabel("Cells in south direction")
+        if export:
+            plt.savefig(save_path, dpi=300)
+
         plt.show()
 
     def run_interactive(self):

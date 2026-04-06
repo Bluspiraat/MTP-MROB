@@ -3,18 +3,19 @@ from path_planners.grid_based import AStar
 import json
 
 if __name__ == '__main__':
-    input_data = "C:/MTP-Data/test_enschede/tiles/predictions/001.tif"
-    reduction_factor = 8
+    tile_index = "004"
+    input_data = f"C:/MTP-Data/test_enschede/tiles/predictions/{tile_index}.tif"
+    reduction_factor = 1
     spacing = 15        # given in meters
-    start_location = (int(9200/reduction_factor), int(8000/reduction_factor))
-    goal_location = (int(6500/reduction_factor), int(9500/reduction_factor))
-    # The minimum cost is set t 1 for the hardened road. The rest follows from this
+    start_location = (int(2080/reduction_factor), int(544/reduction_factor))
+    goal_location = (int(5968/reduction_factor), int(5152/reduction_factor))
+    # The minimum cost is set to 2 for the hardened road. The rest follows from this
     cost_list = [100,   # unknown
                  1,     # hardened
                  1.2,   # half-hardened
                  1.5,   # unhardened
                  2,     # track
-                 3,     # fallow
+                 5,     # fallow
                  3,     # agriculture
                  4,     # forest
                  2.5,     # grassland
@@ -25,15 +26,16 @@ if __name__ == '__main__':
                  10     # other
                  ]
 
-    grid = Grid(input_data, cost_list).resample(reduction_factor)
-    grid.display_grid()
+    grid = Grid(input_data, cost_list)
+    # grid.display_grid()
     a_star = AStar(grid)
+    # a_star.run_interactive()
     a_star.start_search(start_location, goal_location)
-    a_star.display_path_on_grid()
+    a_star.display_path_on_grid(export=True, title=f"Tile {tile_index}, reduction factor {reduction_factor}",
+                                save_path=f"tile_{tile_index}_{reduction_factor}.jpg")
     if len(a_star.path) > 0:
         rd_path = cell_to_rd(a_star.path, grid.resolution, grid.bounds, int(spacing/(0.1*reduction_factor)))
         gps_coords = rd_to_gps(rd_path)
-        json.dump(gps_coords, open('gps_coords.json', 'w'))
-        print(gps_coords)
+        json.dump(gps_coords, open(f'gps_coords_{tile_index}_{reduction_factor}.json', 'w'))
 
     print("Done")
