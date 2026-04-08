@@ -122,7 +122,7 @@ class Grid:
             self.bounds = src.bounds[:]
             return src.read(1).astype('uint8')
 
-    def display_grid(self):
+    def display_grid(self, export = False, export_name="export.jpg"):
         """
         Displays the grid in a matplotlib figure.
 
@@ -130,7 +130,11 @@ class Grid:
         file_name = os.path.basename(self.grid_file)
         plt.title(f'Index of segmented tile: {os.path.splitext(file_name)[0]}\n'
                   f'Resolution of grid: {self.resolution}')
+        plt.xlabel("Cells in east direction")
+        plt.ylabel("Cells in south direction")
         plt.imshow(self.get_colored_grid())
+        if export:
+            plt.savefig(export_name, dpi=300)
         plt.show()
         return plt
 
